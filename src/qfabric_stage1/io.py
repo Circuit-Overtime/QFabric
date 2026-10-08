@@ -34,4 +34,3 @@ def load_measurements(path: Path) -> Iterator[Measurement]:
                 mcu_value=(None if raw.get("mcu_value") is None else int(raw["mcu_value"])),
                 detail=(None if raw.get("detail") is None else str(raw["detail"])),
             )
-

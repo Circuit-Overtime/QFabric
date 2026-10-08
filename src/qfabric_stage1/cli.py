@@ -51,9 +51,7 @@ def connect_bridge(address: str):
     try:
         from arduino.router_bridge import Bridge
     except ImportError as error:
-        raise RuntimeError(
-            "arduino-router-bridge is not installed; see docs/stage-1.md"
-        ) from error
+        raise RuntimeError("arduino-router-bridge is not installed; see docs/stage-1.md") from error
 
     bridge = Bridge(address=address)
     if not bridge.connect(timeout=5):
@@ -116,4 +114,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

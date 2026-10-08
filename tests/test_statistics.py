@@ -1,7 +1,7 @@
 import unittest
 
 from qfabric_stage1.model import Measurement
-from qfabric_stage1.statistics import percentile, summarize
+from qfabric_stage1.statistics import percentile, summarize, summarize_values
 
 
 def measurement(latency_ns: int, outcome: str = "ok") -> Measurement:
@@ -26,6 +26,19 @@ class PercentileTests(unittest.TestCase):
 
 
 class SummaryTests(unittest.TestCase):
+    def test_value_summary(self) -> None:
+        result = summarize_values([5, 7, 9])
+        self.assertEqual(result.count, 3)
+        self.assertEqual(result.minimum, 5)
+        self.assertEqual(result.p50, 7)
+        self.assertEqual(result.maximum, 9)
+        self.assertEqual(result.mean, 7)
+
+    def test_empty_value_summary(self) -> None:
+        result = summarize_values([])
+        self.assertEqual(result.count, 0)
+        self.assertIsNone(result.mean)
+
     def test_summary_excludes_failed_samples(self) -> None:
         result = summarize([measurement(10), measurement(20), measurement(999, "error")])
         self.assertEqual(result.count, 2)

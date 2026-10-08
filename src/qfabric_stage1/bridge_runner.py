@@ -140,4 +140,3 @@ def matrix_updates(
         validate=lambda value, _sequence: isinstance(value, int) and value >= 0,
     )
     return with_run_id(rows)
-

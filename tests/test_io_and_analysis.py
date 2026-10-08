@@ -36,7 +36,39 @@ class MeasurementIoTests(unittest.TestCase):
             self.assertTrue(csv_path.read_text(encoding="utf-8").startswith("experiment,"))
             self.assertEqual(json.loads(json_path.read_text())["schema_version"], 1)
 
+    def test_analysis_separates_runs_and_summarizes_matrix_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw_path = root / "matrix.jsonl"
+            rows = [
+                Measurement(
+                    run_id=run_id,
+                    experiment="matrix-update",
+                    sequence=index,
+                    started_utc="2026-01-01T00:00:00+00:00",
+                    latency_ns=latency,
+                    outcome="ok",
+                    mcu_value=execution,
+                )
+                for run_id, index, latency, execution in (
+                    ("run-a", 0, 100, 5),
+                    ("run-a", 1, 200, 7),
+                    ("run-b", 0, 300, 11),
+                )
+            ]
+            append_measurements(raw_path, rows)
+
+            result = analyze(raw_path, root / "summary.json", root / "summary.csv")
+
+            self.assertEqual(len(result["groups"]), 2)
+            first = result["groups"][0]
+            self.assertEqual(first["run_id"], "run-a")
+            self.assertEqual(first["count"], 2)
+            self.assertEqual(first["mcu_execution_us"]["p50"], 6)
+            csv_text = (root / "summary.csv").read_text(encoding="utf-8")
+            self.assertIn("mcu_execution_p50_us", csv_text)
+            self.assertIn("run-a", csv_text)
+
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -25,6 +25,21 @@ class Measurement:
 
 
 @dataclass(frozen=True, slots=True)
+class DistributionSummary:
+    count: int
+    minimum: int | None
+    p50: float | None
+    p95: float | None
+    p99: float | None
+    maximum: int | None
+    mean: float | None
+    stdev: float | None
+
+    def to_dict(self) -> dict[str, int | float | None]:
+        return asdict(self)
+
+
+@dataclass(frozen=True, slots=True)
 class Summary:
     total: int
     count: int

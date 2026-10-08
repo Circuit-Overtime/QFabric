@@ -190,6 +190,10 @@ qf-stage1 analyze \
 ```
 
 The analyzer reports total and successful sample counts, failure rate, minimum, p50, p95, p99, maximum, mean, population standard deviation, and the achieved sequential call rate grouped by experiment and payload size.
+It keeps distinct `run_id` values separate so repeated runs cannot be silently pooled. For the
+matrix experiment it also reports the MCU-returned `mcu_execution_us` distribution. That local
+value measures the duration of the `Arduino_LED_Matrix.draw()` call; it does not claim to measure
+the panel's complete optical refresh time.
 
 ## Clock rule
 

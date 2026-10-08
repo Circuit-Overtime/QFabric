@@ -16,6 +16,9 @@ idle and CPU-loaded behavior of one Arduino UNO Q configuration and identify fol
 - CPU-loaded concurrency campaign: `stage1-concurrency-cpu-loaded`, QFabric commit `bc559fb`,
   the same repetitions, worker levels, and payload. Its four `stress-ng` CPU workers completed
   successfully over 138.12 seconds with no failed or untrustworthy stress metrics.
+- Idle LED activity campaign: `stage1-led-profiles-idle`, QFabric commit `c091c2b`, three
+  repetitions each with matrix scanning disabled, a static enabled frame, and changing frames
+  requested at 10, 30, and 60 Hz.
 - Each of the four conditions contains 24,000 recorded samples with zero failures, including
   3,000 MCU-initiated round trips: 96,000 samples in total.
 - Loaded profile: `stress-ng --cpu 4 --cpu-method all`, successful for 414.70 seconds.
@@ -76,6 +79,17 @@ is measured from the complete batch wall time rather than inferred from mean per
 | 4 | 205.68 | 212.00 | +3.1% | 17.12 | 16.10 | 19.28 | 21.99 |
 | 8 | 257.31 | 261.92 | +1.8% | 26.25 | 25.84 | 30.74 | 33.79 |
 
+The LED table reports Linux-observed 8-byte echo latency. Rates in parentheses are achieved
+application frame writes measured by the MCU; they are not the panel's optical scan frequency.
+
+| Matrix profile | Mean p50 ms | Mean p95 ms | Mean p99 ms | Maximum ms | Mean call rate/s |
+|---|---:|---:|---:|---:|---:|
+| Driver disabled | 9.59 | 10.22 | 10.45 | 11.04 | 104.95 |
+| Static enabled | 9.73 | 10.41 | 10.63 | 11.13 | 103.48 |
+| 10 Hz requested (9.87 Hz) | 9.75 | 10.39 | 10.58 | 18.56 | 103.45 |
+| 30 Hz requested (28.83 Hz) | 9.73 | 10.41 | 10.62 | 12.96 | 103.49 |
+| 60 Hz requested (55.67 Hz) | 9.74 | 10.40 | 10.60 | 11.36 | 103.41 |
+
 ## Observations
 
 - Under `schedutil`, CPU load reduced Linux-initiated median latency by 2.5% to 20.1%, but
@@ -129,6 +143,16 @@ is measured from the complete batch wall time rather than inferred from mean per
 - Every post-level diagnostic reported exactly 1,101 requests since reset: 100 warmups, 1,000
   measured calls, and one health check. The largest observed MCU main-loop gap was 5.224 ms at
   idle and 5.222 ms under load, and all 24 post-level health checks passed.
+- All 15 LED profile runs completed 15,000 measured calls without a failure or post-profile health
+  loss. Enabling matrix scanning increased mean repetition-level p50 by about 1.5% and reduced
+  sequential call rate by about 1.4% relative to the disabled driver. Static, 10 Hz, 30 Hz, and
+  60 Hz profiles were effectively indistinguishable at p50 through p99, so the dominant measured
+  cost is enabling matrix scanning rather than changing the frame-write rate in this range.
+- The MCU achieved 9.87, 28.83, and 55.67 application frame writes/s for the requested 10, 30,
+  and 60 Hz profiles. The scheduler intentionally does not issue catch-up bursts, so missed loop
+  deadlines reduce achieved rate. The worst local `Arduino_LED_Matrix.draw()` call was 18 us,
+  while post-profile maximum loop gaps ranged from 3.711 to 4.041 ms. These measurements do not
+  establish optical refresh or PWM timing.
 
 ## Required follow-up
 
@@ -136,5 +160,4 @@ is measured from the complete batch wall time rather than inferred from mean per
 - Explain the loaded reverse-path distribution with Router or scheduler tracing and continuous
   frequency telemetry; do not derive a contract threshold from its mean alone.
 - Add bounded clock offset/drift analysis before attempting any one-way latency estimate.
-- Measure LED enabled/disabled and refresh-rate profiles rather than only individual draw calls.
 - Record MCU queue, memory, and utilization headroom before proposing contract thresholds.

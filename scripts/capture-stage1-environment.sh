@@ -38,6 +38,33 @@ mkdir -p "$(dirname "$output_path")"
   echo "[memory]"
   free -h
   echo
+  echo "[cpu-frequency]"
+  for policy in /sys/devices/system/cpu/cpufreq/policy*; do
+    if [[ ! -d "$policy" ]]; then
+      continue
+    fi
+    echo "policy=$policy"
+    for attribute in \
+      scaling_governor \
+      scaling_available_governors \
+      scaling_min_freq \
+      scaling_max_freq \
+      scaling_cur_freq \
+      cpuinfo_min_freq \
+      cpuinfo_max_freq; do
+      if [[ -r "$policy/$attribute" ]]; then
+        echo "$attribute=$(<"$policy/$attribute")"
+      fi
+    done
+  done
+  echo
+  echo "[thermal-zones]"
+  for zone in /sys/class/thermal/thermal_zone*; do
+    if [[ -r "$zone/type" && -r "$zone/temp" ]]; then
+      echo "$(<"$zone/type")=$(<"$zone/temp")"
+    fi
+  done
+  echo
   echo "[qfabric-repository]"
   git rev-parse HEAD
   git status --short

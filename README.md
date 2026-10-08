@@ -16,6 +16,8 @@ Stage 1 characterizes the UNO Q before contract thresholds or placement policy a
 - Linux behavior under controlled load.
 
 See [Stage 1 documentation](docs/stage-1.md) for installation, checks, flashing, execution, and analysis commands.
+The current idle-versus-loaded evidence and open measurement questions are recorded in
+[Stage 1 preliminary findings](docs/stage-1-findings.md).
 
 ## Local checks
 
@@ -25,4 +27,3 @@ The hardware-independent tests use only Python's standard library:
 python3 -m unittest discover -s tests -v
 python3 -m compileall -q src tests
 ```
-

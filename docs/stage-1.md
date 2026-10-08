@@ -120,6 +120,21 @@ bash scripts/capture-stage1-environment.sh
 
 ## Smoke tests
 
+Run the complete smoke suite from the UNO Q Linux environment. The script verifies the Router
+socket, captures the environment, and writes each run to a new timestamped directory:
+
+```bash
+bash scripts/run-stage1-smoke.sh
+```
+
+An optional run label makes a result directory easier to identify:
+
+```bash
+bash scripts/run-stage1-smoke.sh first-hardware-run
+```
+
+The equivalent individual commands are:
+
 ```bash
 qf-stage1 run roundtrip \
   --payload-size 8 \

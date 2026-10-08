@@ -135,6 +135,37 @@ class MeasurementIoTests(unittest.TestCase):
             csv_text = (root / "summary.csv").read_text(encoding="utf-8")
             self.assertIn("concurrent_successes_per_second", csv_text)
 
+    def test_analysis_reports_clock_alignment_bounds(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw_path = root / "clock.jsonl"
+            rows = [
+                Measurement(
+                    run_id="clock-run",
+                    experiment="clock-alignment",
+                    sequence=index,
+                    started_utc="2026-01-01T00:00:00+00:00",
+                    latency_ns=1000,
+                    outcome="ok",
+                    mcu_value=1_000_000 + index * 100_000,
+                    linux_started_ns=6_000_000_000 + index * 100_010_000 - 500,
+                    linux_finished_ns=6_000_000_000 + index * 100_010_000 + 500,
+                )
+                for index in range(3)
+            ]
+            append_measurements(raw_path, rows)
+
+            result = analyze(raw_path, root / "summary.json", root / "summary.csv")
+
+            group = result["groups"][0]
+            self.assertEqual(group["clock_alignment_samples"], 3)
+            self.assertEqual(group["clock_uncertainty_minimum_ns"], 500)
+            self.assertIsNotNone(group["clock_drift_regression_ppm"])
+            self.assertIn(
+                "clock_drift_lower_ppm",
+                (root / "summary.csv").read_text(encoding="utf-8"),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

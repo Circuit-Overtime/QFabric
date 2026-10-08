@@ -19,6 +19,8 @@ class Measurement:
     detail: str | None = None
     concurrency: int = 1
     batch_elapsed_ns: int | None = None
+    linux_started_ns: int | None = None
+    linux_finished_ns: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result = asdict(self)

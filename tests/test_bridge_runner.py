@@ -4,6 +4,7 @@ import unittest
 
 from qfabric_stage1.bridge_runner import (
     check_bridge,
+    clock_alignment_samples,
     concurrent_roundtrips,
     configure_matrix_profile,
     matrix_profile_roundtrips,
@@ -109,6 +110,17 @@ class FakeMatrixProfileBridge:
         if method == "qf_stage1_echo":
             return args[0]
         raise AssertionError(method)
+
+
+class FakeClockBridge:
+    def __init__(self):
+        self.value = 1000
+
+    def call(self, method, *args, timeout=5):
+        if method != "qf_stage1_micros":
+            raise AssertionError(method)
+        self.value += 100
+        return self.value
 
 
 class BridgeRunnerTests(unittest.TestCase):
@@ -217,6 +229,26 @@ class BridgeRunnerTests(unittest.TestCase):
             configure_matrix_profile(bridge, mode="static", refresh_hz=30, timeout=1)
         with self.assertRaises(ValueError):
             configure_matrix_profile(bridge, mode="refresh", refresh_hz=121, timeout=1)
+
+    def test_clock_alignment_records_linux_brackets(self) -> None:
+        rows = list(
+            clock_alignment_samples(
+                FakeClockBridge(),
+                iterations=3,
+                warmup=1,
+                timeout=1,
+                interval_ms=0,
+            )
+        )
+
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all(row.experiment == "clock-alignment" for row in rows))
+        self.assertTrue(all(row.outcome == "ok" for row in rows))
+        self.assertTrue(all(row.linux_started_ns is not None for row in rows))
+        self.assertTrue(all(row.linux_finished_ns is not None for row in rows))
+        self.assertTrue(
+            all(row.linux_finished_ns >= row.linux_started_ns for row in rows)
+        )
 
 
 if __name__ == "__main__":

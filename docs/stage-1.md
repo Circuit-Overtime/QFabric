@@ -460,6 +460,45 @@ recovered or the probe is reflashed.
 
 Linux `perf_counter_ns()` measures end-to-end call duration. MCU `micros()` is stored only as a local clock sample or local execution diagnostic. Do not subtract the two clocks. The reverse benchmark measures an MCU-clocked round trip, not one-way MCU-to-Linux latency. A one-way timing model requires a separate offset/drift method and uncertainty bound.
 
+The clock-alignment experiment provides that bounded characterization without claiming that RPC
+delay is symmetric. Each MCU `micros()` value is bracketed by Linux monotonic timestamps taken
+immediately before and after its RPC. The midpoint is an offset estimate; half the complete RPC
+interval is its uncertainty bound. The analyzer unwraps the 32-bit MCU microsecond counter,
+regresses midpoint offset against Linux elapsed time, and reports a conservative drift interval
+from the lowest-latency samples in the first and last 10% windows. Positive drift means the Linux
+monotonic clock advances faster than the MCU clock under this definition.
+
+Run a short smoke test first:
+
+```bash
+qf-stage1 run clock-align \
+  --iterations 20 \
+  --warmup 5 \
+  --interval-ms 50 \
+  --timeout 2 \
+  --output data/raw/smoke/clock-alignment.jsonl
+
+qf-stage1 analyze \
+  --input data/raw/smoke/clock-alignment.jsonl \
+  --json data/processed/smoke/clock-alignment.json \
+  --csv data/processed/smoke/clock-alignment.csv
+
+qf-stage1 check --timeout 2
+```
+
+After the smoke test passes, run three approximately five-minute repetitions:
+
+```bash
+bash scripts/run-stage1-clock-alignment-campaign.sh \
+  stage1-clock-alignment-idle
+```
+
+The defaults are 600 samples at 500 ms spacing with ten warmups. Raw samples retain both Linux
+bracket timestamps and the MCU timestamp. Absolute offset is specific to the two arbitrary clock
+epochs; drift, uncertainty, and changes in offset are the portable results. Even after drift is
+characterized, one-way latency must not be claimed more precisely than the reported alignment
+uncertainty permits.
+
 ## Stage completion gate
 
 Stage 1 is complete only when issue #2 contains:

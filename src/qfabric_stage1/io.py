@@ -39,4 +39,14 @@ def load_measurements(path: Path) -> Iterator[Measurement]:
                     if raw.get("batch_elapsed_ns") is None
                     else int(raw["batch_elapsed_ns"])
                 ),
+                linux_started_ns=(
+                    None
+                    if raw.get("linux_started_ns") is None
+                    else int(raw["linux_started_ns"])
+                ),
+                linux_finished_ns=(
+                    None
+                    if raw.get("linux_finished_ns") is None
+                    else int(raw["linux_finished_ns"])
+                ),
             )

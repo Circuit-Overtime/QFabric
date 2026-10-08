@@ -11,6 +11,7 @@ from .analysis import analyze
 from .bridge_runner import (
     MATRIX_PROFILE_MODES,
     check_bridge,
+    clock_alignment_samples,
     clock_samples,
     concurrent_roundtrips,
     configure_matrix_profile,
@@ -47,7 +48,15 @@ def build_parser() -> argparse.ArgumentParser:
     run = subparsers.add_parser("run", help="run one hardware benchmark")
     run.add_argument(
         "experiment",
-        choices=("roundtrip", "concurrency", "reverse", "clock", "matrix", "led-profile"),
+        choices=(
+            "roundtrip",
+            "concurrency",
+            "reverse",
+            "clock",
+            "clock-align",
+            "matrix",
+            "led-profile",
+        ),
     )
     run.add_argument("--output", type=Path, required=True)
     run.add_argument("--iterations", type=positive_integer, default=1000)
@@ -58,6 +67,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--led-mode", choices=("disabled", "static", "refresh"))
     run.add_argument("--refresh-hz", type=nonnegative_integer, default=0)
     run.add_argument("--profile-output", type=Path)
+    run.add_argument("--interval-ms", type=nonnegative_integer, default=500)
     run.add_argument("--address", default="unix:///var/run/arduino-router.sock")
 
     check = subparsers.add_parser("check", help="verify Router and MCU benchmark availability")
@@ -157,6 +167,14 @@ def run_hardware(args: argparse.Namespace) -> int:
                 iterations=args.iterations,
                 warmup=args.warmup,
                 timeout=args.timeout,
+            )
+        elif args.experiment == "clock-align":
+            rows = clock_alignment_samples(
+                bridge,
+                iterations=args.iterations,
+                warmup=args.warmup,
+                timeout=args.timeout,
+                interval_ms=args.interval_ms,
             )
         elif args.experiment == "matrix":
             rows = matrix_updates(

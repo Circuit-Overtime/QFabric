@@ -5,6 +5,7 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
+from .clock_analysis import analyze_clock_alignment
 from .io import load_measurements
 from .model import Measurement
 from .statistics import summarize, summarize_values
@@ -51,6 +52,11 @@ def analyze(input_path: Path, json_path: Path, csv_path: Path) -> dict[str, obje
         elif experiment == "mcu-linux-roundtrip":
             diagnostic = ("mcu_roundtrip", "mcu_roundtrip_us")
 
+        if experiment == "clock-alignment":
+            clock_alignment = analyze_clock_alignment(rows)
+            item.update(clock_alignment)
+            csv_item.update(clock_alignment)
+
         if diagnostic is not None:
             csv_prefix, json_name = diagnostic
             execution = summarize_values(
@@ -91,6 +97,21 @@ def analyze(input_path: Path, json_path: Path, csv_path: Path) -> dict[str, obje
         "concurrent_batch_elapsed_ns",
         "concurrent_attempts_per_second",
         "concurrent_successes_per_second",
+        "clock_alignment_samples",
+        "clock_sample_span_ns",
+        "clock_mcu_wraps",
+        "clock_uncertainty_minimum_ns",
+        "clock_uncertainty_p50_ns",
+        "clock_uncertainty_p95_ns",
+        "clock_uncertainty_p99_ns",
+        "clock_uncertainty_maximum_ns",
+        "clock_offset_midpoint_start_ns",
+        "clock_offset_midpoint_end_ns",
+        "clock_drift_regression_ppm",
+        "clock_drift_lower_ppm",
+        "clock_drift_upper_ppm",
+        "clock_endpoint_window_samples",
+        "clock_drift_endpoint_span_ns",
         "mcu_execution_count",
         "mcu_execution_minimum_us",
         "mcu_execution_p50_us",

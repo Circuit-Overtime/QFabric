@@ -101,6 +101,8 @@ def with_run_id(rows: Iterable[Measurement], run_id: str | None = None) -> Itera
             detail=row.detail,
             concurrency=row.concurrency,
             batch_elapsed_ns=row.batch_elapsed_ns,
+            linux_started_ns=row.linux_started_ns,
+            linux_finished_ns=row.linux_finished_ns,
         )
 
 
@@ -214,6 +216,57 @@ def clock_samples(
         validate=lambda value, _sequence: isinstance(value, int),
     )
     return with_run_id(rows)
+
+
+def clock_alignment_samples(
+    bridge: BridgeClient,
+    *,
+    iterations: int,
+    warmup: int,
+    timeout: float,
+    interval_ms: int,
+) -> Iterator[Measurement]:
+    if iterations <= 0:
+        raise ValueError("iterations must be positive")
+    if warmup < 0:
+        raise ValueError("warmup cannot be negative")
+    if interval_ms < 0:
+        raise ValueError("clock sample interval cannot be negative")
+
+    def measurements() -> Iterator[Measurement]:
+        for sequence in range(-warmup, iterations):
+            started_utc = utc_now()
+            linux_started_ns = time.perf_counter_ns()
+            try:
+                value = bridge.call("qf_stage1_micros", timeout=timeout)
+                linux_finished_ns = time.perf_counter_ns()
+                valid = isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                outcome = "ok" if valid else "invalid-result"
+                detail = None if valid else repr(value)
+                mcu_value = value if valid else None
+            except Exception as error:
+                linux_finished_ns = time.perf_counter_ns()
+                outcome = "error"
+                detail = f"{type(error).__name__}: {error}"
+                mcu_value = None
+
+            if sequence >= 0:
+                yield Measurement(
+                    run_id="",
+                    experiment="clock-alignment",
+                    sequence=sequence,
+                    started_utc=started_utc,
+                    latency_ns=linux_finished_ns - linux_started_ns,
+                    outcome=outcome,
+                    mcu_value=mcu_value,
+                    detail=detail,
+                    linux_started_ns=linux_started_ns,
+                    linux_finished_ns=linux_finished_ns,
+                )
+                if sequence + 1 < iterations and interval_ms > 0:
+                    time.sleep(interval_ms / 1000)
+
+    return with_run_id(measurements())
 
 
 def matrix_updates(

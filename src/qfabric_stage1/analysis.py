@@ -11,21 +11,40 @@ from .statistics import summarize, summarize_values
 
 
 def analyze(input_path: Path, json_path: Path, csv_path: Path) -> dict[str, object]:
-    groups: dict[tuple[str, int, str], list[Measurement]] = defaultdict(list)
+    groups: dict[tuple[str, int, int, str], list[Measurement]] = defaultdict(list)
     for row in load_measurements(input_path):
-        groups[(row.experiment, row.payload_bytes, row.run_id)].append(row)
+        groups[(row.experiment, row.payload_bytes, row.concurrency, row.run_id)].append(row)
 
     summaries: list[dict[str, object]] = []
     csv_rows: list[dict[str, object]] = []
-    for (experiment, payload_bytes, run_id), rows in sorted(groups.items()):
+    for (experiment, payload_bytes, concurrency, run_id), rows in sorted(groups.items()):
         item: dict[str, object] = {
             "experiment": experiment,
             "payload_bytes": payload_bytes,
+            "concurrency": concurrency,
             "run_id": run_id,
         }
         item.update(summarize(rows).to_dict())
 
         csv_item = dict(item)
+        batch_elapsed_values = {
+            row.batch_elapsed_ns for row in rows if row.batch_elapsed_ns is not None
+        }
+        if batch_elapsed_values:
+            if len(batch_elapsed_values) != 1:
+                raise ValueError(f"run {run_id} contains inconsistent concurrent batch timings")
+            batch_elapsed_ns = batch_elapsed_values.pop()
+            if batch_elapsed_ns <= 0:
+                raise ValueError(f"run {run_id} contains an invalid concurrent batch timing")
+            successful = sum(row.outcome == "ok" for row in rows)
+            concurrent_metrics: dict[str, int | float] = {
+                "concurrent_batch_elapsed_ns": batch_elapsed_ns,
+                "concurrent_attempts_per_second": len(rows) * 1_000_000_000 / batch_elapsed_ns,
+                "concurrent_successes_per_second": successful * 1_000_000_000
+                / batch_elapsed_ns,
+            }
+            item.update(concurrent_metrics)
+            csv_item.update(concurrent_metrics)
         diagnostic: tuple[str, str] | None = None
         if experiment == "matrix-update":
             diagnostic = ("mcu_execution", "mcu_execution_us")
@@ -55,6 +74,7 @@ def analyze(input_path: Path, json_path: Path, csv_path: Path) -> dict[str, obje
     fieldnames = [
         "experiment",
         "payload_bytes",
+        "concurrency",
         "run_id",
         "total",
         "count",
@@ -68,6 +88,9 @@ def analyze(input_path: Path, json_path: Path, csv_path: Path) -> dict[str, obje
         "mean_ns",
         "stdev_ns",
         "sequential_calls_per_second",
+        "concurrent_batch_elapsed_ns",
+        "concurrent_attempts_per_second",
+        "concurrent_successes_per_second",
         "mcu_execution_count",
         "mcu_execution_minimum_us",
         "mcu_execution_p50_us",

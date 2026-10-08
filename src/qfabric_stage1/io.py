@@ -33,4 +33,10 @@ def load_measurements(path: Path) -> Iterator[Measurement]:
                 payload_bytes=int(raw.get("payload_bytes", 0)),
                 mcu_value=(None if raw.get("mcu_value") is None else int(raw["mcu_value"])),
                 detail=(None if raw.get("detail") is None else str(raw["detail"])),
+                concurrency=int(raw.get("concurrency", 1)),
+                batch_elapsed_ns=(
+                    None
+                    if raw.get("batch_elapsed_ns") is None
+                    else int(raw["batch_elapsed_ns"])
+                ),
             )

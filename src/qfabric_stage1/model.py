@@ -17,6 +17,8 @@ class Measurement:
     payload_bytes: int = 0
     mcu_value: int | None = None
     detail: str | None = None
+    concurrency: int = 1
+    batch_elapsed_ns: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result = asdict(self)

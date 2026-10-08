@@ -164,6 +164,9 @@ class BridgeRunnerTests(unittest.TestCase):
         self.assertEqual(len(rows), 7)
         self.assertTrue(all(row.outcome == "ok" for row in rows))
         self.assertTrue(all(row.experiment == "rpc-concurrency-3" for row in rows))
+        self.assertTrue(all(row.concurrency == 3 for row in rows))
+        self.assertEqual(len({row.batch_elapsed_ns for row in rows}), 1)
+        self.assertGreater(rows[0].batch_elapsed_ns, 0)
         self.assertEqual(bridge.maximum_active, 3)
 
 

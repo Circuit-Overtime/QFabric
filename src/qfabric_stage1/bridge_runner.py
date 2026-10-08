@@ -4,6 +4,7 @@ import time
 import uuid
 from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -96,6 +97,8 @@ def with_run_id(rows: Iterable[Measurement], run_id: str | None = None) -> Itera
             payload_bytes=row.payload_bytes,
             mcu_value=row.mcu_value,
             detail=row.detail,
+            concurrency=row.concurrency,
+            batch_elapsed_ns=row.batch_elapsed_ns,
         )
 
 
@@ -163,6 +166,7 @@ def concurrent_roundtrips(
             outcome=outcome,
             payload_bytes=len(payload.encode()),
             detail=detail,
+            concurrency=workers,
         )
 
     def run_phase(executor: ThreadPoolExecutor, count: int, *, warmup_phase: bool):
@@ -185,7 +189,11 @@ def concurrent_roundtrips(
             warmup_rows = run_phase(executor, warmup, warmup_phase=True)
             if any(row.outcome != "ok" for row in warmup_rows):
                 raise RuntimeError("concurrency warmup failed; measured calls were not started")
-            yield from run_phase(executor, iterations, warmup_phase=False)
+            batch_started_ns = time.perf_counter_ns()
+            measured_rows = run_phase(executor, iterations, warmup_phase=False)
+            batch_elapsed_ns = time.perf_counter_ns() - batch_started_ns
+            for row in measured_rows:
+                yield replace(row, batch_elapsed_ns=batch_elapsed_ns)
 
     return with_run_id(measurements())
 

@@ -85,7 +85,32 @@ def connect_bridge(address: str):
 
 def print_summary(rows: Iterable[Measurement]) -> list[Measurement]:
     collected = list(rows)
-    print(json.dumps(summarize(collected).to_dict(), indent=2, sort_keys=True))
+    result: dict[str, object] = summarize(collected).to_dict()
+    batch_elapsed_values = {
+        row.batch_elapsed_ns for row in collected if row.batch_elapsed_ns is not None
+    }
+    if len(batch_elapsed_values) == 1:
+        batch_elapsed_ns = batch_elapsed_values.pop()
+        assert batch_elapsed_ns is not None
+        if batch_elapsed_ns <= 0:
+            raise ValueError("concurrent batch timing must be positive")
+        concurrency_values = {row.concurrency for row in collected}
+        if len(concurrency_values) != 1:
+            raise ValueError("concurrent measurements contain inconsistent worker counts")
+        successful = sum(row.outcome == "ok" for row in collected)
+        result.update(
+            {
+                "concurrency": concurrency_values.pop(),
+                "concurrent_batch_elapsed_ns": batch_elapsed_ns,
+                "concurrent_attempts_per_second": len(collected)
+                * 1_000_000_000
+                / batch_elapsed_ns,
+                "concurrent_successes_per_second": successful
+                * 1_000_000_000
+                / batch_elapsed_ns,
+            }
+        )
+    print(json.dumps(result, indent=2, sort_keys=True))
     return collected
 
 

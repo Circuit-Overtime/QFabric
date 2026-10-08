@@ -303,8 +303,8 @@ those capabilities explicitly as unavailable instead of estimating them. Direct 
 also unavailable through Arduino RouterBridge 0.4.3; practical queue headroom is measured by a
 separate bounded concurrency sweep.
 
-Run concurrency levels individually and verify health between them. Each runner submits at most
-`--workers` calls at once and stops before the next batch if any call fails:
+Smoke-test concurrency levels individually and verify health between them. Each runner submits at
+most `--workers` calls at once and stops before the next batch if any call fails:
 
 ```bash
 qf-stage1 resources \
@@ -325,8 +325,21 @@ qf-stage1 resources \
   --output data/raw/resources/concurrency-workers-02.json
 ```
 
-Do not launch all levels from one unattended loop. A failed level is saturation evidence: retain
-its partial JSONL, stop escalation, and recover the Bridge before further baseline measurements.
+Do not launch untested levels from an unattended loop. A failed level is saturation evidence:
+retain its partial JSONL, stop escalation, and recover the Bridge before further baseline
+measurements. After every intended level has passed its individual smoke test, run the gated
+three-repetition campaign:
+
+```bash
+QF_REPETITIONS=3 QF_ITERATIONS=1000 QF_WARMUP=100 \
+QF_CONCURRENCY_LEVELS="1 2 4 8" \
+  bash scripts/run-stage1-concurrency-campaign.sh \
+  idle stage1-concurrency-idle
+```
+
+The campaign captures resource diagnostics before and after each level, performs an immediate
+Bridge health check, analyzes every completed JSONL file, and stops before escalation on any
+measurement or health failure.
 
 Static flash and SRAM usage remain build outputs. Capture them whenever the firmware changes:
 
@@ -349,11 +362,19 @@ qf-stage1 analyze \
   --csv data/processed/rpc-roundtrip-summary.csv
 ```
 
-The analyzer reports total and successful sample counts, failure rate, minimum, p50, p95, p99, maximum, mean, population standard deviation, and the achieved sequential call rate grouped by experiment and payload size.
+The analyzer reports total and successful sample counts, failure rate, minimum, p50, p95, p99,
+maximum, mean, population standard deviation, and the achieved sequential call rate grouped by
+experiment, payload size, and concurrency.
 It keeps distinct `run_id` values separate so repeated runs cannot be silently pooled. For the
 matrix experiment it also reports the MCU-returned `mcu_execution_us` distribution. That local
 value measures the duration of the `Arduino_LED_Matrix.draw()` call; it does not claim to measure
 the panel's complete optical refresh time.
+
+Concurrency runs additionally report the measured batch wall time and aggregate attempt and
+success rates. Use `concurrent_successes_per_second` for concurrent throughput. The generic
+`sequential_calls_per_second` field is the reciprocal of mean per-call latency and is retained for
+cross-experiment consistency; it is not aggregate throughput when `concurrency` is greater than
+one.
 
 For `mcu-linux-roundtrip`, the analyzer additionally reports `mcu_roundtrip_us`. This is measured
 entirely with the MCU `micros()` clock around an MCU-originated call to the Linux-provided echo

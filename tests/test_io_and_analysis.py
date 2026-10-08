@@ -100,6 +100,41 @@ class MeasurementIoTests(unittest.TestCase):
                 (root / "summary.csv").read_text(encoding="utf-8"),
             )
 
+    def test_analysis_reports_concurrent_wall_clock_rate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw_path = root / "concurrency.jsonl"
+            rows = [
+                Measurement(
+                    run_id="concurrent-run",
+                    experiment="rpc-concurrency-4",
+                    sequence=index,
+                    started_utc="2026-01-01T00:00:00+00:00",
+                    latency_ns=latency,
+                    outcome=outcome,
+                    payload_bytes=8,
+                    concurrency=4,
+                    batch_elapsed_ns=1_000_000_000,
+                )
+                for index, latency, outcome in (
+                    (0, 100, "ok"),
+                    (1, 200, "ok"),
+                    (2, 300, "ok"),
+                    (3, 400, "error"),
+                )
+            ]
+            append_measurements(raw_path, rows)
+
+            result = analyze(raw_path, root / "summary.json", root / "summary.csv")
+
+            group = result["groups"][0]
+            self.assertEqual(group["concurrency"], 4)
+            self.assertEqual(group["concurrent_batch_elapsed_ns"], 1_000_000_000)
+            self.assertEqual(group["concurrent_attempts_per_second"], 4)
+            self.assertEqual(group["concurrent_successes_per_second"], 3)
+            csv_text = (root / "summary.csv").read_text(encoding="utf-8")
+            self.assertIn("concurrent_successes_per_second", csv_text)
+
 
 if __name__ == "__main__":
     unittest.main()

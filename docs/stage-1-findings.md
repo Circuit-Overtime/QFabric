@@ -97,6 +97,12 @@ statistics.
   responses while the Linux Router remained active and accepted client connections. Treat runtime
   allocator probing as unsafe on the stock image; the successful allocations are not accepted as
   safe-headroom limits.
+- Bounded 8-byte concurrency smoke tests completed without failures at 2, 4, and 8 workers, and
+  the Bridge remained healthy after every level. Median per-call latency increased from 11.41 ms
+  at 2 workers to 14.51 ms at 4 and 25.69 ms at 8; p99 increased from 12.44 ms to 17.26 ms and
+  27.94 ms, respectively. These are smoke samples, not final throughput results. The full campaign
+  records batch wall time so aggregate throughput is measured directly rather than inferred from
+  the reciprocal of mean per-call latency.
 
 ## Required follow-up
 

@@ -9,6 +9,7 @@ run_label="${2:-$(date --utc +%Y%m%dT%H%M%SZ)}"
 repetitions="${QF_REPETITIONS:-3}"
 iterations="${QF_ITERATIONS:-1000}"
 warmup="${QF_WARMUP:-100}"
+load_description="${QF_LOAD_DESCRIPTION:-none}"
 
 for value in "$condition" "$run_label"; do
   if [[ ! "$value" =~ ^[A-Za-z0-9._-]+$ ]]; then
@@ -60,6 +61,7 @@ bash scripts/capture-stage1-environment.sh "$campaign_root/environment.txt"
   echo "repetitions=$repetitions"
   echo "iterations=$iterations"
   echo "warmup=$warmup"
+  echo "load_description=$load_description"
 } >"$campaign_root/campaign.txt"
 
 sample_failures=0

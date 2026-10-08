@@ -10,4 +10,4 @@ dist/
 # Stage 1 measurements are generated on the UNO Q and intentionally untracked.
 data/raw/
 data/processed/
-
+data/logs/

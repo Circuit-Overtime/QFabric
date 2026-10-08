@@ -222,10 +222,14 @@ stress-ng --version
 Start with CPU contention only:
 
 ```bash
-stress-ng --cpu 4 --cpu-method all --metrics-brief --timeout 10m
+QF_REPETITIONS=3 QF_ITERATIONS=1000 QF_WARMUP=100 \
+  bash scripts/run-stage1-loaded-campaign.sh initial-cpu-load
 ```
 
-Run the QFabric sweep from a second session while the load is active. Later runs may add memory and I/O contention, but each load profile must be recorded separately.
+The wrapper starts four `stress-ng` CPU workers, waits ten seconds for load stabilization, records
+the exact profile and stress metrics, runs the campaign, and terminates only the load process it
+started. `QF_STRESS_CPU_WORKERS` and `QF_STRESS_WARMUP_SECONDS` override those defaults. Later
+runs may add memory and I/O contention, but each load profile must be recorded separately.
 
 ## Analysis
 

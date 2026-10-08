@@ -191,6 +191,15 @@ samples because payload-limit failures are useful saturation evidence. It stops 
 an infrastructure error. Never concatenate measurements from different firmware or system
 configurations without matching environment metadata.
 
+Before each payload configuration, the sweep performs one call with a bounded timeout. A failed
+preflight records 20 attempts instead of waiting for 1,000 default five-second timeouts. The
+limits are configurable when investigating the boundary:
+
+```bash
+QF_PREFLIGHT_TIMEOUT=0.25 QF_FAILURE_ITERATIONS=20 QF_TIMEOUT=5 \
+  bash scripts/run-stage1-campaign.sh idle initial-idle
+```
+
 ## Controlled Linux contention
 
 Install the load generator on the UNO Q:

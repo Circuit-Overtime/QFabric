@@ -37,6 +37,10 @@ mkdir -p "$(dirname "$output_path")"
   echo
   echo "[memory]"
   free -h
+  echo
+  echo "[qfabric-repository]"
+  git rev-parse HEAD
+  git status --short
 } >"$output_path" 2>&1
 
 echo "wrote $output_path"

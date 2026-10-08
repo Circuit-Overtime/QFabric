@@ -155,12 +155,26 @@ qf-stage1 run matrix \
 
 ## Full payload sweep
 
+Run a complete three-repetition idle campaign from the UNO Q. This includes every configured
+payload size plus clock and matrix experiments, with separate raw and processed files for each
+repetition:
+
+```bash
+QF_REPETITIONS=3 QF_ITERATIONS=1000 QF_WARMUP=100 \
+  bash scripts/run-stage1-campaign.sh idle initial-idle
+```
+
+The lower-level payload-only command remains available for focused experiments:
+
 ```bash
 QF_ITERATIONS=1000 QF_WARMUP=100 \
   bash scripts/run-stage1-payload-sweep.sh
 ```
 
-Repeat every configuration at least three times with distinct output files. Never concatenate measurements from different firmware or system configurations without matching environment metadata.
+The campaign runner exits with status 2 if RPC samples fail, but retains and analyzes those
+samples because payload-limit failures are useful saturation evidence. It stops immediately for
+an infrastructure error. Never concatenate measurements from different firmware or system
+configurations without matching environment metadata.
 
 ## Controlled Linux contention
 

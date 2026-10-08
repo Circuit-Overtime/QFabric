@@ -17,7 +17,11 @@ mkdir -p "$(dirname "$output_path")"
   python3 --version
   echo
   echo "[arduino-cli]"
-  arduino-cli version
+  if command -v arduino-cli >/dev/null 2>&1; then
+    arduino-cli version
+  else
+    echo "not installed in the UNO Q Linux environment; compile and upload from the workstation"
+  fi
   echo
   echo "[router-status]"
   systemctl --no-pager --full status arduino-router || true
@@ -36,4 +40,3 @@ mkdir -p "$(dirname "$output_path")"
 } >"$output_path" 2>&1
 
 echo "wrote $output_path"
-

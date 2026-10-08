@@ -341,6 +341,20 @@ The campaign captures resource diagnostics before and after each level, performs
 Bridge health check, analyzes every completed JSONL file, and stops before escalation on any
 measurement or health failure.
 
+After the idle campaign is complete, run the matched CPU-loaded campaign. This wrapper uses the
+same four-worker `stress-ng` profile as the earlier loaded baseline, waits ten seconds for load to
+stabilize, records its metrics, and always stops the process it started:
+
+```bash
+QF_REPETITIONS=3 QF_ITERATIONS=1000 QF_WARMUP=100 \
+QF_CONCURRENCY_LEVELS="1 2 4 8" \
+  bash scripts/run-stage1-loaded-concurrency-campaign.sh \
+  stage1-concurrency-cpu-loaded
+```
+
+`QF_STRESS_CPU_WORKERS` and `QF_STRESS_WARMUP_SECONDS` override the four-worker and ten-second
+defaults. Keep them unchanged for a direct comparison with `stage1-concurrency-idle`.
+
 Static flash and SRAM usage remain build outputs. Capture them whenever the firmware changes:
 
 ```bash

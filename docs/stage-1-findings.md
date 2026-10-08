@@ -11,6 +11,8 @@ idle and CPU-loaded behavior of one Arduino UNO Q configuration and identify fol
   `stage1-performance-cpu-loaded`, QFabric commit `1cef3ad`, three repetitions each. The
   benchmark and MCU probe were unchanged from `c246e8d`; the later commit added the safe
   governor wrapper.
+- Idle concurrency campaign: `stage1-concurrency-idle`, QFabric commit `931dbb8`, three
+  repetitions each at 1, 2, 4, and 8 workers with an 8-byte payload.
 - Each of the four conditions contains 24,000 recorded samples with zero failures, including
   3,000 MCU-initiated round trips: 96,000 samples in total.
 - Loaded profile: `stress-ng --cpu 4 --cpu-method all`, successful for 414.70 seconds.
@@ -97,12 +99,13 @@ statistics.
   responses while the Linux Router remained active and accepted client connections. Treat runtime
   allocator probing as unsafe on the stock image; the successful allocations are not accepted as
   safe-headroom limits.
-- Bounded 8-byte concurrency smoke tests completed without failures at 2, 4, and 8 workers, and
-  the Bridge remained healthy after every level. Median per-call latency increased from 11.41 ms
-  at 2 workers to 14.51 ms at 4 and 25.69 ms at 8; p99 increased from 12.44 ms to 17.26 ms and
-  27.94 ms, respectively. These are smoke samples, not final throughput results. The full campaign
-  records batch wall time so aggregate throughput is measured directly rather than inferred from
-  the reciprocal of mean per-call latency.
+- The idle concurrency campaign completed 12,000 measured calls without failures, and every
+  post-level Bridge health check passed. Mean aggregate throughput across the three repetitions
+  was 96.75, 148.15, 205.68, and 257.31 successful calls/s at 1, 2, 4, and 8 workers. Relative to
+  one worker, eight workers delivered 2.66 times the throughput while mean p50 per-call latency
+  increased from 9.42 ms to 26.25 ms and mean p99 from 10.63 ms to 30.74 ms. Throughput varied by
+  less than 1% within every worker level, supporting repeatability. Scaling is beneficial but
+  sublinear; eight workers are the highest verified level, not an asserted saturation boundary.
 
 ## Required follow-up
 

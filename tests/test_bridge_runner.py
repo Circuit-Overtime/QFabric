@@ -1,6 +1,11 @@
 import unittest
 
-from qfabric_stage1.bridge_runner import check_bridge, payload_for_size, roundtrip
+from qfabric_stage1.bridge_runner import (
+    check_bridge,
+    mcu_to_linux_roundtrips,
+    payload_for_size,
+    roundtrip,
+)
 
 
 class FakeBridge:
@@ -8,6 +13,46 @@ class FakeBridge:
         if method != "qf_stage1_echo":
             raise AssertionError(method)
         return args[0]
+
+    def provide(self, method, handler):
+        raise AssertionError(method)
+
+    def unprovide(self, method):
+        raise AssertionError(method)
+
+
+class FakeReverseBridge:
+    def __init__(self):
+        self.handler = None
+        self.duration_us = None
+        self.pending_polls = 0
+
+    def provide(self, method, handler):
+        if method != "qf_stage1_linux_echo":
+            raise AssertionError(method)
+        self.handler = handler
+
+    def unprovide(self, method):
+        if method != "qf_stage1_linux_echo":
+            raise AssertionError(method)
+        self.handler = None
+
+    def call(self, method, *args, timeout=5):
+        if method == "qf_stage1_reverse_start":
+            if self.handler is None:
+                raise AssertionError("handler is unavailable")
+            token = args[0]
+            if self.handler(token) != token:
+                raise AssertionError("token mismatch")
+            self.duration_us = 42
+            self.pending_polls = 1
+            return True
+        if method == "qf_stage1_reverse_result":
+            if self.pending_polls:
+                self.pending_polls -= 1
+                return -1
+            return self.duration_us
+        raise AssertionError(method)
 
 
 class BridgeRunnerTests(unittest.TestCase):
@@ -33,6 +78,22 @@ class BridgeRunnerTests(unittest.TestCase):
         self.assertTrue(all(row.outcome == "ok" for row in rows))
         self.assertTrue(all(row.payload_bytes == 8 for row in rows))
         self.assertEqual(len({row.run_id for row in rows}), 1)
+
+    def test_mcu_to_linux_roundtrip(self) -> None:
+        bridge = FakeReverseBridge()
+        rows = list(
+            mcu_to_linux_roundtrips(
+                bridge,
+                iterations=3,
+                warmup=2,
+                timeout=1,
+            )
+        )
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all(row.outcome == "ok" for row in rows))
+        self.assertTrue(all(row.mcu_value == 42 for row in rows))
+        self.assertEqual(len({row.run_id for row in rows}), 1)
+        self.assertIsNone(bridge.handler)
 
 
 if __name__ == "__main__":

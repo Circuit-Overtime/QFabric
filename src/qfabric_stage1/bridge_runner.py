@@ -12,6 +12,10 @@ from .model import Measurement
 class BridgeClient(Protocol):
     def call(self, method: str, *args: Any, timeout: float = 5) -> Any: ...
 
+    def provide(self, method: str, handler: Callable[..., Any]) -> None: ...
+
+    def unprovide(self, method: str) -> None: ...
+
 
 def check_bridge(bridge: BridgeClient, *, timeout: float) -> None:
     payload = "qfabric-health-check"
@@ -147,3 +151,72 @@ def matrix_updates(
         validate=lambda value, _sequence: isinstance(value, int) and value >= 0,
     )
     return with_run_id(rows)
+
+
+def mcu_to_linux_roundtrips(
+    bridge: BridgeClient, *, iterations: int, warmup: int, timeout: float
+) -> Iterator[Measurement]:
+    if iterations <= 0:
+        raise ValueError("iterations must be positive")
+    if warmup < 0:
+        raise ValueError("warmup cannot be negative")
+
+    def linux_echo(token: int) -> int:
+        return token
+
+    def measurements() -> Iterator[Measurement]:
+        bridge.provide("qf_stage1_linux_echo", linux_echo)
+        try:
+            for index in range(-warmup, iterations):
+                token = index + warmup + 1
+                started_utc = utc_now()
+                started_ns = time.perf_counter_ns()
+                try:
+                    accepted = bridge.call("qf_stage1_reverse_start", token, timeout=timeout)
+                    if accepted is not True:
+                        raise RuntimeError(f"MCU rejected reverse token {token}")
+
+                    deadline = time.monotonic() + timeout
+                    while True:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            raise TimeoutError(
+                                f"MCU reverse result for token {token} timed out after {timeout}s"
+                            )
+                        duration_us = bridge.call(
+                            "qf_stage1_reverse_result", token, timeout=remaining
+                        )
+                        if duration_us != -1:
+                            break
+                        time.sleep(min(0.001, remaining))
+
+                    latency_ns = time.perf_counter_ns() - started_ns
+                    valid = (
+                        isinstance(duration_us, int)
+                        and not isinstance(duration_us, bool)
+                        and duration_us >= 0
+                    )
+                    outcome = "ok" if valid else "invalid-result"
+                    detail = None if valid else repr(duration_us)
+                    mcu_value = duration_us if valid else None
+                except Exception as error:
+                    latency_ns = time.perf_counter_ns() - started_ns
+                    outcome = "error"
+                    detail = f"{type(error).__name__}: {error}"
+                    mcu_value = None
+
+                if index >= 0:
+                    yield Measurement(
+                        run_id="",
+                        experiment="mcu-linux-roundtrip",
+                        sequence=index,
+                        started_utc=started_utc,
+                        latency_ns=latency_ns,
+                        outcome=outcome,
+                        mcu_value=mcu_value,
+                        detail=detail,
+                    )
+        finally:
+            bridge.unprovide("qf_stage1_linux_echo")
+
+    return with_run_id(measurements())

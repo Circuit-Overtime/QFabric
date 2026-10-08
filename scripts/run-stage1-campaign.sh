@@ -98,6 +98,11 @@ for ((repetition = 1; repetition <= repetitions; repetition += 1)); do
     bash scripts/run-stage1-payload-sweep.sh \
     config/stage1-payload-sizes.txt "$raw_root/roundtrip.jsonl"
 
+  run_measurement qf-stage1 run reverse \
+    --iterations "$iterations" \
+    --warmup "$warmup" \
+    --output "$raw_root/reverse.jsonl"
+
   run_measurement qf-stage1 run clock \
     --iterations "$iterations" \
     --warmup "$warmup" \
@@ -108,7 +113,7 @@ for ((repetition = 1; repetition <= repetitions; repetition += 1)); do
     --warmup "$warmup" \
     --output "$raw_root/matrix.jsonl"
 
-  for experiment in roundtrip clock matrix; do
+  for experiment in roundtrip reverse clock matrix; do
     qf-stage1 analyze \
       --input "$raw_root/$experiment.jsonl" \
       --json "$summary_root/$experiment.json" \

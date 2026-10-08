@@ -161,6 +161,11 @@ qf-stage1 run roundtrip \
   --warmup 5 \
   --output data/raw/smoke.jsonl
 
+qf-stage1 run reverse \
+  --iterations 20 \
+  --warmup 5 \
+  --output data/raw/smoke-reverse.jsonl
+
 qf-stage1 run clock \
   --iterations 20 \
   --warmup 5 \
@@ -175,8 +180,8 @@ qf-stage1 run matrix \
 ## Full payload sweep
 
 Run a complete three-repetition idle campaign from the UNO Q. This includes every configured
-payload size plus clock and matrix experiments, with separate raw and processed files for each
-repetition:
+payload size plus reverse-direction, clock, and matrix experiments, with separate raw and
+processed files for each repetition:
 
 ```bash
 QF_REPETITIONS=3 QF_ITERATIONS=1000 QF_WARMUP=100 \
@@ -246,9 +251,18 @@ matrix experiment it also reports the MCU-returned `mcu_execution_us` distributi
 value measures the duration of the `Arduino_LED_Matrix.draw()` call; it does not claim to measure
 the panel's complete optical refresh time.
 
+For `mcu-linux-roundtrip`, the analyzer additionally reports `mcu_roundtrip_us`. This is measured
+entirely with the MCU `micros()` clock around an MCU-originated call to the Linux-provided echo
+handler, so it is the primary reverse-path metric. The ordinary `latency_ns` for that experiment
+is Linux orchestration time covering the start request, reverse call, polling, and result request;
+it is diagnostic rather than a one-way latency measurement. The Linux callback only returns the
+token and must not make a nested Bridge call. If the Linux benchmark process is terminated while
+the MCU is making its reverse call, that MCU call can remain blocked until the Router path is
+recovered or the probe is reflashed.
+
 ## Clock rule
 
-Linux `perf_counter_ns()` measures end-to-end call duration. MCU `micros()` is stored only as a local clock sample or local execution diagnostic. Do not subtract the two clocks. A one-way timing model requires a separate offset/drift method and uncertainty bound.
+Linux `perf_counter_ns()` measures end-to-end call duration. MCU `micros()` is stored only as a local clock sample or local execution diagnostic. Do not subtract the two clocks. The reverse benchmark measures an MCU-clocked round trip, not one-way MCU-to-Linux latency. A one-way timing model requires a separate offset/drift method and uncertainty bound.
 
 ## Stage completion gate
 

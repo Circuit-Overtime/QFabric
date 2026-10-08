@@ -7,7 +7,13 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from .analysis import analyze
-from .bridge_runner import check_bridge, clock_samples, matrix_updates, roundtrip
+from .bridge_runner import (
+    check_bridge,
+    clock_samples,
+    matrix_updates,
+    mcu_to_linux_roundtrips,
+    roundtrip,
+)
 from .io import append_measurements
 from .model import Measurement
 from .statistics import summarize
@@ -32,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     run = subparsers.add_parser("run", help="run one hardware benchmark")
-    run.add_argument("experiment", choices=("roundtrip", "clock", "matrix"))
+    run.add_argument("experiment", choices=("roundtrip", "reverse", "clock", "matrix"))
     run.add_argument("--output", type=Path, required=True)
     run.add_argument("--iterations", type=positive_integer, default=1000)
     run.add_argument("--warmup", type=nonnegative_integer, default=100)
@@ -77,6 +83,13 @@ def run_hardware(args: argparse.Namespace) -> int:
             rows = roundtrip(
                 bridge,
                 payload_size=args.payload_size,
+                iterations=args.iterations,
+                warmup=args.warmup,
+                timeout=args.timeout,
+            )
+        elif args.experiment == "reverse":
+            rows = mcu_to_linux_roundtrips(
+                bridge,
                 iterations=args.iterations,
                 warmup=args.warmup,
                 timeout=args.timeout,

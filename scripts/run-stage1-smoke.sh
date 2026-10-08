@@ -44,6 +44,11 @@ qf-stage1 run roundtrip \
   --warmup "$warmup" \
   --output "$output_dir/roundtrip.jsonl"
 
+qf-stage1 run reverse \
+  --iterations "$iterations" \
+  --warmup "$warmup" \
+  --output "$output_dir/reverse.jsonl"
+
 qf-stage1 run clock \
   --iterations "$iterations" \
   --warmup "$warmup" \

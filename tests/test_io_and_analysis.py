@@ -69,6 +69,37 @@ class MeasurementIoTests(unittest.TestCase):
             self.assertIn("mcu_execution_p50_us", csv_text)
             self.assertIn("run-a", csv_text)
 
+    def test_analysis_summarizes_mcu_to_linux_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw_path = root / "reverse.jsonl"
+            rows = [
+                Measurement(
+                    run_id="reverse-run",
+                    experiment="mcu-linux-roundtrip",
+                    sequence=index,
+                    started_utc="2026-01-01T00:00:00+00:00",
+                    latency_ns=latency,
+                    outcome="ok",
+                    mcu_value=duration,
+                )
+                for index, latency, duration in (
+                    (0, 100_000, 20),
+                    (1, 120_000, 40),
+                    (2, 140_000, 60),
+                )
+            ]
+            append_measurements(raw_path, rows)
+
+            result = analyze(raw_path, root / "summary.json", root / "summary.csv")
+
+            group = result["groups"][0]
+            self.assertEqual(group["mcu_roundtrip_us"]["p50"], 40)
+            self.assertIn(
+                "mcu_roundtrip_p50_us",
+                (root / "summary.csv").read_text(encoding="utf-8"),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

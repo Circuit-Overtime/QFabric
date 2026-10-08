@@ -26,14 +26,21 @@ def analyze(input_path: Path, json_path: Path, csv_path: Path) -> dict[str, obje
         item.update(summarize(rows).to_dict())
 
         csv_item = dict(item)
+        diagnostic: tuple[str, str] | None = None
         if experiment == "matrix-update":
+            diagnostic = ("mcu_execution", "mcu_execution_us")
+        elif experiment == "mcu-linux-roundtrip":
+            diagnostic = ("mcu_roundtrip", "mcu_roundtrip_us")
+
+        if diagnostic is not None:
+            csv_prefix, json_name = diagnostic
             execution = summarize_values(
                 row.mcu_value for row in rows if row.outcome == "ok" and row.mcu_value is not None
             )
-            item["mcu_execution_us"] = execution.to_dict()
+            item[json_name] = execution.to_dict()
             csv_item.update(
                 {
-                    f"mcu_execution_{name}_us" if name != "count" else "mcu_execution_count": value
+                    f"{csv_prefix}_{name}_us" if name != "count" else f"{csv_prefix}_count": value
                     for name, value in execution.to_dict().items()
                 }
             )
@@ -69,6 +76,14 @@ def analyze(input_path: Path, json_path: Path, csv_path: Path) -> dict[str, obje
         "mcu_execution_maximum_us",
         "mcu_execution_mean_us",
         "mcu_execution_stdev_us",
+        "mcu_roundtrip_count",
+        "mcu_roundtrip_minimum_us",
+        "mcu_roundtrip_p50_us",
+        "mcu_roundtrip_p95_us",
+        "mcu_roundtrip_p99_us",
+        "mcu_roundtrip_maximum_us",
+        "mcu_roundtrip_mean_us",
+        "mcu_roundtrip_stdev_us",
     ]
     with csv_path.open("w", encoding="utf-8", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fieldnames)

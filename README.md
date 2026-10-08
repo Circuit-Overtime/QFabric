@@ -8,7 +8,7 @@ Development is organized by the tracking issues in the [GitHub issue tracker](ht
 
 Stage 1 characterizes the UNO Q before contract thresholds or placement policy are implemented. It measures:
 
-- Linux↔MCU Bridge round-trip latency;
+- Linux-initiated Linux→MCU→Linux and MCU-initiated MCU→Linux→MCU Bridge latency;
 - payload-size and sequential RPC-rate behavior;
 - cross-domain clock samples without subtracting unsynchronized clocks;
 - MCU execution and queueing diagnostics;

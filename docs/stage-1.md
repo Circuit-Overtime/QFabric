@@ -288,10 +288,14 @@ qf-stage1 resources \
 ```
 
 The snapshot records configured kernel-heap, main-stack, Bridge-thread-stack, decoder-buffer,
-and request-buffer capacities. It also performs bounded, reversible allocation probes against
-the Zephyr kernel and C-library heaps and reports loop iterations and the worst observed main-loop
-gap since the last reset. Allocation probes report the largest successful block at 16-byte
-resolution; they are fragmentation-sensitive diagnostics, not total-free-memory measurements.
+and request-buffer capacities. It also reports loop iterations and the worst observed main-loop
+gap since the last reset.
+
+Runtime allocation probing is intentionally disabled. A bounded probe that allocated and
+immediately released blocks through the stock Zephyr kernel and C-library allocators completed
+once, but the MCU subsequently stopped producing RPC responses while the Linux Router remained
+active. That failure is retained as negative saturation evidence; do not repeat it on the baseline
+firmware. The configured capacities and build-time section sizes are safe, non-mutating evidence.
 
 The stock UNO Q Zephyr 1.0.0 image enables thread stack metadata but not initialized-stack
 watermarks, system-heap runtime statistics, or thread runtime statistics. The snapshot reports

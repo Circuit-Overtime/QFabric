@@ -92,6 +92,11 @@ statistics.
 - Payloads through 128 bytes completed cleanly. An initial 256-byte probe produced sustained
   timeouts and eventually required MCU firmware re-registration. Sizes at and above 256 bytes
   are isolated from baseline campaigns until a reset-safe boundary method is implemented.
+- A bounded runtime allocation probe successfully allocated and released 8 KiB from the Zephyr
+  kernel heap and 32 KiB from the C-library heap, but the MCU later stopped producing all RPC
+  responses while the Linux Router remained active and accepted client connections. Treat runtime
+  allocator probing as unsafe on the stock image; the successful allocations are not accepted as
+  safe-headroom limits.
 
 ## Required follow-up
 

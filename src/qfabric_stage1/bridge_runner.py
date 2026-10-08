@@ -165,14 +165,9 @@ def _call_nonnegative_integer(
 def resource_snapshot(
     bridge: BridgeClient,
     *,
-    kernel_probe_cap: int,
-    libc_probe_cap: int,
     timeout: float,
     reset_after: bool = False,
 ) -> dict[str, object]:
-    if kernel_probe_cap <= 0 or libc_probe_cap <= 0:
-        raise ValueError("allocation probe caps must be positive")
-
     constants = {
         "kernel_heap_capacity_bytes": _call_nonnegative_integer(
             bridge, "qf_stage1_resource_constant", 0, timeout=timeout
@@ -192,21 +187,6 @@ def resource_snapshot(
     }
     capabilities = _call_nonnegative_integer(
         bridge, "qf_stage1_resource_constant", 5, timeout=timeout
-    )
-
-    kernel_largest = _call_nonnegative_integer(
-        bridge,
-        "qf_stage1_largest_allocation",
-        0,
-        kernel_probe_cap,
-        timeout=timeout,
-    )
-    libc_largest = _call_nonnegative_integer(
-        bridge,
-        "qf_stage1_largest_allocation",
-        1,
-        libc_probe_cap,
-        timeout=timeout,
     )
 
     diagnostics = {
@@ -238,18 +218,9 @@ def resource_snapshot(
             "system_heap_runtime_statistics": bool(capabilities & (1 << 1)),
             "thread_runtime_statistics": bool(capabilities & (1 << 2)),
         },
-        "allocation_probes": {
-            "kernel": {
-                "probe_cap_bytes": kernel_probe_cap,
-                "largest_success_bytes": kernel_largest,
-                "cap_reached": kernel_largest >= kernel_probe_cap,
-            },
-            "libc": {
-                "probe_cap_bytes": libc_probe_cap,
-                "largest_success_bytes": libc_largest,
-                "cap_reached": libc_largest >= libc_probe_cap,
-            },
-            "granularity_bytes": 16,
+        "limitations": {
+            "runtime_allocation_probe": "disabled-unsafe-on-stock-uno-q",
+            "direct_routerbridge_queue_depth": "unavailable",
         },
         "diagnostics": diagnostics,
         "diagnostics_reset_after_capture": reset_after,

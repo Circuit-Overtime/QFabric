@@ -1,16 +1,11 @@
 #include <Arduino_LED_Matrix.h>
 #include <Arduino_RouterBridge.h>
 
-#include <stdlib.h>
-
 Arduino_LED_Matrix qf_matrix;
 
 constexpr size_t QF_MATRIX_ROWS = 8;
 constexpr size_t QF_MATRIX_COLUMNS = 13;
 constexpr size_t QF_MATRIX_PIXELS = QF_MATRIX_ROWS * QF_MATRIX_COLUMNS;
-constexpr uint32_t QF_ALLOCATION_GRANULARITY = 16;
-constexpr uint32_t QF_LIBC_PROBE_MAX_BYTES = 128 * 1024;
-
 constexpr uint32_t QF_RESOURCE_KERNEL_HEAP_BYTES = 0;
 constexpr uint32_t QF_RESOURCE_MAIN_STACK_BYTES = 1;
 constexpr uint32_t QF_RESOURCE_BRIDGE_STACK_BYTES = 2;
@@ -130,37 +125,6 @@ uint32_t qf_stage1_resource_constant(uint32_t resource) {
   }
 }
 
-uint32_t qf_stage1_largest_allocation(uint32_t allocator, uint32_t requested_cap) {
-  uint32_t cap = requested_cap;
-  if (allocator == 0) {
-    cap = min(cap, static_cast<uint32_t>(CONFIG_HEAP_MEM_POOL_SIZE));
-  } else if (allocator == 1) {
-    cap = min(cap, QF_LIBC_PROBE_MAX_BYTES);
-  } else {
-    return 0;
-  }
-
-  uint32_t low = 0;
-  uint32_t high = cap / QF_ALLOCATION_GRANULARITY;
-  while (low < high) {
-    const uint32_t middle = low + (high - low + 1) / 2;
-    const size_t bytes = middle * QF_ALLOCATION_GRANULARITY;
-    void* block = allocator == 0 ? k_malloc(bytes) : malloc(bytes);
-    if (block == nullptr) {
-      high = middle - 1;
-      continue;
-    }
-
-    if (allocator == 0) {
-      k_free(block);
-    } else {
-      free(block);
-    }
-    low = middle;
-  }
-  return low * QF_ALLOCATION_GRANULARITY;
-}
-
 uint32_t qf_stage1_diagnostic(uint32_t diagnostic) {
   switch (diagnostic) {
     case QF_DIAGNOSTIC_REQUEST_COUNT:
@@ -201,7 +165,6 @@ void setup() {
   Bridge.provide_safe("qf_stage1_reverse_start", qf_stage1_reverse_start);
   Bridge.provide_safe("qf_stage1_reverse_result", qf_stage1_reverse_result);
   Bridge.provide_safe("qf_stage1_resource_constant", qf_stage1_resource_constant);
-  Bridge.provide_safe("qf_stage1_largest_allocation", qf_stage1_largest_allocation);
   Bridge.provide_safe("qf_stage1_diagnostic", qf_stage1_diagnostic);
   Bridge.provide_safe("qf_stage1_reset_diagnostics", qf_stage1_reset_diagnostics);
 }

@@ -63,8 +63,6 @@ class FakeResourceBridge:
     def call(self, method, *args, timeout=5):
         if method == "qf_stage1_resource_constant":
             return (32768, 32768, 500, 1024, 256, 0)[args[0]]
-        if method == "qf_stage1_largest_allocation":
-            return args[1] - 16
         if method == "qf_stage1_diagnostic":
             return (123, 456, 789, 1000)[args[0]]
         if method == "qf_stage1_reset_diagnostics":
@@ -117,14 +115,15 @@ class BridgeRunnerTests(unittest.TestCase):
         bridge = FakeResourceBridge()
         result = resource_snapshot(
             bridge,
-            kernel_probe_cap=32768,
-            libc_probe_cap=131072,
             timeout=1,
             reset_after=True,
         )
         self.assertEqual(result["constants"]["rpc_request_buffer_bytes"], 256)
-        self.assertEqual(result["allocation_probes"]["kernel"]["largest_success_bytes"], 32752)
         self.assertFalse(result["capabilities"]["stack_watermark"])
+        self.assertEqual(
+            result["limitations"]["runtime_allocation_probe"],
+            "disabled-unsafe-on-stock-uno-q",
+        )
         self.assertEqual(result["diagnostics"]["maximum_loop_gap_us"], 789)
         self.assertTrue(result["diagnostics_reset_after_capture"])
         self.assertTrue(bridge.reset)

@@ -55,8 +55,6 @@ def build_parser() -> argparse.ArgumentParser:
         "resources", help="capture MCU capacity and runtime headroom diagnostics"
     )
     resources.add_argument("--output", type=Path, required=True)
-    resources.add_argument("--kernel-probe-cap", type=positive_integer, default=32768)
-    resources.add_argument("--libc-probe-cap", type=positive_integer, default=131072)
     resources.add_argument("--timeout", type=float, default=5.0)
     resources.add_argument("--reset-after", action="store_true")
     resources.add_argument("--address", default="unix:///var/run/arduino-router.sock")
@@ -142,8 +140,6 @@ def capture_resources(args: argparse.Namespace) -> int:
     try:
         snapshot = resource_snapshot(
             bridge,
-            kernel_probe_cap=args.kernel_probe_cap,
-            libc_probe_cap=args.libc_probe_cap,
             timeout=args.timeout,
             reset_after=args.reset_after,
         )

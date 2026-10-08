@@ -85,6 +85,21 @@ third-party Bridge or matrix libraries.
 
 ## Compile and flash the MCU probe
 
+For VS Code C/C++ IntelliSense, run the `Arduino: refresh UNO Q IntelliSense` task or generate
+the pinned compilation database directly:
+
+```bash
+arduino-cli compile \
+  --fqbn arduino:zephyr:unoq \
+  --only-compilation-database \
+  --build-path build/stage1-probe \
+  benchmarks/stage1/mcu/stage1_probe
+```
+
+The repository maps `.ino` files to C++ and points the C/C++ extension at that database. Because
+`build/` is generated and ignored, refresh the database after changing the pinned Arduino core or
+library versions.
+
 Compile first:
 
 ```bash

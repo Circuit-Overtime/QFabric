@@ -10,6 +10,7 @@ from .analysis import analyze
 from .bridge_runner import (
     check_bridge,
     clock_samples,
+    concurrent_roundtrips,
     matrix_updates,
     mcu_to_linux_roundtrips,
     resource_snapshot,
@@ -39,12 +40,15 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     run = subparsers.add_parser("run", help="run one hardware benchmark")
-    run.add_argument("experiment", choices=("roundtrip", "reverse", "clock", "matrix"))
+    run.add_argument(
+        "experiment", choices=("roundtrip", "concurrency", "reverse", "clock", "matrix")
+    )
     run.add_argument("--output", type=Path, required=True)
     run.add_argument("--iterations", type=positive_integer, default=1000)
     run.add_argument("--warmup", type=nonnegative_integer, default=100)
     run.add_argument("--timeout", type=float, default=5.0)
     run.add_argument("--payload-size", type=nonnegative_integer, default=0)
+    run.add_argument("--workers", type=positive_integer, default=1)
     run.add_argument("--address", default="unix:///var/run/arduino-router.sock")
 
     check = subparsers.add_parser("check", help="verify Router and MCU benchmark availability")
@@ -92,6 +96,15 @@ def run_hardware(args: argparse.Namespace) -> int:
             rows = roundtrip(
                 bridge,
                 payload_size=args.payload_size,
+                iterations=args.iterations,
+                warmup=args.warmup,
+                timeout=args.timeout,
+            )
+        elif args.experiment == "concurrency":
+            rows = concurrent_roundtrips(
+                bridge,
+                payload_size=args.payload_size,
+                workers=args.workers,
                 iterations=args.iterations,
                 warmup=args.warmup,
                 timeout=args.timeout,

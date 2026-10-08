@@ -303,6 +303,31 @@ those capabilities explicitly as unavailable instead of estimating them. Direct 
 also unavailable through Arduino RouterBridge 0.4.3; practical queue headroom is measured by a
 separate bounded concurrency sweep.
 
+Run concurrency levels individually and verify health between them. Each runner submits at most
+`--workers` calls at once and stops before the next batch if any call fails:
+
+```bash
+qf-stage1 resources \
+  --reset-after \
+  --output data/raw/resources/concurrency-baseline.json
+
+qf-stage1 run concurrency \
+  --workers 2 \
+  --payload-size 8 \
+  --iterations 100 \
+  --warmup 10 \
+  --timeout 2 \
+  --output data/raw/concurrency/workers-02.jsonl
+
+qf-stage1 check --timeout 2
+
+qf-stage1 resources \
+  --output data/raw/resources/concurrency-workers-02.json
+```
+
+Do not launch all levels from one unattended loop. A failed level is saturation evidence: retain
+its partial JSONL, stop escalation, and recover the Bridge before further baseline measurements.
+
 Static flash and SRAM usage remain build outputs. Capture them whenever the firmware changes:
 
 ```bash

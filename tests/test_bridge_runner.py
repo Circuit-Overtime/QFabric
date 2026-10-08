@@ -1,7 +1,10 @@
+import threading
+import time
 import unittest
 
 from qfabric_stage1.bridge_runner import (
     check_bridge,
+    concurrent_roundtrips,
     mcu_to_linux_roundtrips,
     payload_for_size,
     resource_snapshot,
@@ -71,6 +74,24 @@ class FakeResourceBridge:
         raise AssertionError(method)
 
 
+class FakeConcurrentBridge:
+    def __init__(self):
+        self.active = 0
+        self.maximum_active = 0
+        self.lock = threading.Lock()
+
+    def call(self, method, *args, timeout=5):
+        if method != "qf_stage1_echo":
+            raise AssertionError(method)
+        with self.lock:
+            self.active += 1
+            self.maximum_active = max(self.maximum_active, self.active)
+        time.sleep(0.005)
+        with self.lock:
+            self.active -= 1
+        return args[0]
+
+
 class BridgeRunnerTests(unittest.TestCase):
     def test_bridge_health_check(self) -> None:
         check_bridge(FakeBridge(), timeout=1)
@@ -127,6 +148,23 @@ class BridgeRunnerTests(unittest.TestCase):
         self.assertEqual(result["diagnostics"]["maximum_loop_gap_us"], 789)
         self.assertTrue(result["diagnostics_reset_after_capture"])
         self.assertTrue(bridge.reset)
+
+    def test_concurrent_roundtrips_bound_outstanding_calls(self) -> None:
+        bridge = FakeConcurrentBridge()
+        rows = list(
+            concurrent_roundtrips(
+                bridge,
+                payload_size=8,
+                workers=3,
+                iterations=7,
+                warmup=3,
+                timeout=1,
+            )
+        )
+        self.assertEqual(len(rows), 7)
+        self.assertTrue(all(row.outcome == "ok" for row in rows))
+        self.assertTrue(all(row.experiment == "rpc-concurrency-3" for row in rows))
+        self.assertEqual(bridge.maximum_active, 3)
 
 
 if __name__ == "__main__":

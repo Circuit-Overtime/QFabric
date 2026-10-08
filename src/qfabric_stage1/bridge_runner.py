@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 from collections.abc import Callable, Iterable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -119,6 +120,74 @@ def roundtrip(
         validate=lambda value, _sequence: value == payload,
     )
     return with_run_id(rows)
+
+
+def concurrent_roundtrips(
+    bridge: BridgeClient,
+    *,
+    payload_size: int,
+    workers: int,
+    iterations: int,
+    warmup: int,
+    timeout: float,
+) -> Iterator[Measurement]:
+    if workers <= 0:
+        raise ValueError("workers must be positive")
+    if iterations <= 0:
+        raise ValueError("iterations must be positive")
+    if warmup < 0:
+        raise ValueError("warmup cannot be negative")
+
+    payload = payload_for_size(payload_size)
+
+    def measure(sequence: int) -> Measurement:
+        started_utc = utc_now()
+        started_ns = time.perf_counter_ns()
+        try:
+            value = bridge.call("qf_stage1_echo", payload, timeout=timeout)
+            latency_ns = time.perf_counter_ns() - started_ns
+            valid = value == payload
+            outcome = "ok" if valid else "invalid-result"
+            detail = None if valid else repr(value)
+        except Exception as error:
+            latency_ns = time.perf_counter_ns() - started_ns
+            outcome = "error"
+            detail = f"{type(error).__name__}: {error}"
+
+        return Measurement(
+            run_id="",
+            experiment=f"rpc-concurrency-{workers}",
+            sequence=sequence,
+            started_utc=started_utc,
+            latency_ns=latency_ns,
+            outcome=outcome,
+            payload_bytes=len(payload.encode()),
+            detail=detail,
+        )
+
+    def run_phase(executor: ThreadPoolExecutor, count: int, *, warmup_phase: bool):
+        collected: list[Measurement] = []
+        for offset in range(0, count, workers):
+            batch_size = min(workers, count - offset)
+            if warmup_phase:
+                sequences = range(-count + offset, -count + offset + batch_size)
+            else:
+                sequences = range(offset, offset + batch_size)
+            futures = [executor.submit(measure, sequence) for sequence in sequences]
+            batch = [future.result() for future in futures]
+            collected.extend(batch)
+            if any(row.outcome != "ok" for row in batch):
+                break
+        return collected
+
+    def measurements() -> Iterator[Measurement]:
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="qfabric-rpc") as executor:
+            warmup_rows = run_phase(executor, warmup, warmup_phase=True)
+            if any(row.outcome != "ok" for row in warmup_rows):
+                raise RuntimeError("concurrency warmup failed; measured calls were not started")
+            yield from run_phase(executor, iterations, warmup_phase=False)
+
+    return with_run_id(measurements())
 
 
 def clock_samples(

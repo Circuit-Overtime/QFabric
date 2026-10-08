@@ -4,6 +4,7 @@ from qfabric_stage1.bridge_runner import (
     check_bridge,
     mcu_to_linux_roundtrips,
     payload_for_size,
+    resource_snapshot,
     roundtrip,
 )
 
@@ -55,6 +56,23 @@ class FakeReverseBridge:
         raise AssertionError(method)
 
 
+class FakeResourceBridge:
+    def __init__(self):
+        self.reset = False
+
+    def call(self, method, *args, timeout=5):
+        if method == "qf_stage1_resource_constant":
+            return (32768, 32768, 500, 1024, 256, 0)[args[0]]
+        if method == "qf_stage1_largest_allocation":
+            return args[1] - 16
+        if method == "qf_stage1_diagnostic":
+            return (123, 456, 789, 1000)[args[0]]
+        if method == "qf_stage1_reset_diagnostics":
+            self.reset = True
+            return True
+        raise AssertionError(method)
+
+
 class BridgeRunnerTests(unittest.TestCase):
     def test_bridge_health_check(self) -> None:
         check_bridge(FakeBridge(), timeout=1)
@@ -94,6 +112,22 @@ class BridgeRunnerTests(unittest.TestCase):
         self.assertTrue(all(row.mcu_value == 42 for row in rows))
         self.assertEqual(len({row.run_id for row in rows}), 1)
         self.assertIsNone(bridge.handler)
+
+    def test_resource_snapshot(self) -> None:
+        bridge = FakeResourceBridge()
+        result = resource_snapshot(
+            bridge,
+            kernel_probe_cap=32768,
+            libc_probe_cap=131072,
+            timeout=1,
+            reset_after=True,
+        )
+        self.assertEqual(result["constants"]["rpc_request_buffer_bytes"], 256)
+        self.assertEqual(result["allocation_probes"]["kernel"]["largest_success_bytes"], 32752)
+        self.assertFalse(result["capabilities"]["stack_watermark"])
+        self.assertEqual(result["diagnostics"]["maximum_loop_gap_us"], 789)
+        self.assertTrue(result["diagnostics_reset_after_capture"])
+        self.assertTrue(bridge.reset)
 
 
 if __name__ == "__main__":

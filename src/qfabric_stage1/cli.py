@@ -12,6 +12,7 @@ from .bridge_runner import (
     clock_samples,
     matrix_updates,
     mcu_to_linux_roundtrips,
+    resource_snapshot,
     roundtrip,
 )
 from .io import append_measurements
@@ -49,6 +50,16 @@ def build_parser() -> argparse.ArgumentParser:
     check = subparsers.add_parser("check", help="verify Router and MCU benchmark availability")
     check.add_argument("--timeout", type=float, default=2.0)
     check.add_argument("--address", default="unix:///var/run/arduino-router.sock")
+
+    resources = subparsers.add_parser(
+        "resources", help="capture MCU capacity and runtime headroom diagnostics"
+    )
+    resources.add_argument("--output", type=Path, required=True)
+    resources.add_argument("--kernel-probe-cap", type=positive_integer, default=32768)
+    resources.add_argument("--libc-probe-cap", type=positive_integer, default=131072)
+    resources.add_argument("--timeout", type=float, default=5.0)
+    resources.add_argument("--reset-after", action="store_true")
+    resources.add_argument("--address", default="unix:///var/run/arduino-router.sock")
 
     analysis = subparsers.add_parser("analyze", help="summarize JSONL measurements")
     analysis.add_argument("--input", type=Path, required=True)
@@ -126,6 +137,26 @@ def check_hardware(args: argparse.Namespace) -> int:
         bridge.disconnect()
 
 
+def capture_resources(args: argparse.Namespace) -> int:
+    bridge = connect_bridge(args.address)
+    try:
+        snapshot = resource_snapshot(
+            bridge,
+            kernel_probe_cap=args.kernel_probe_cap,
+            libc_probe_cap=args.libc_probe_cap,
+            timeout=args.timeout,
+            reset_after=args.reset_after,
+        )
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(
+            json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        print(json.dumps(snapshot, indent=2, sort_keys=True))
+        return 0
+    finally:
+        bridge.disconnect()
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
@@ -135,6 +166,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "check":
             return check_hardware(args)
+        if args.command == "resources":
+            return capture_resources(args)
         return run_hardware(args)
     except (OSError, RuntimeError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)

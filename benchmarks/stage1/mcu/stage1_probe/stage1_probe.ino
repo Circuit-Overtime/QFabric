@@ -1,11 +1,27 @@
 #include <Arduino_LED_Matrix.h>
 #include <Arduino_RouterBridge.h>
 
+#include <stdlib.h>
+
 Arduino_LED_Matrix qf_matrix;
 
 constexpr size_t QF_MATRIX_ROWS = 8;
 constexpr size_t QF_MATRIX_COLUMNS = 13;
 constexpr size_t QF_MATRIX_PIXELS = QF_MATRIX_ROWS * QF_MATRIX_COLUMNS;
+constexpr uint32_t QF_ALLOCATION_GRANULARITY = 16;
+constexpr uint32_t QF_LIBC_PROBE_MAX_BYTES = 128 * 1024;
+
+constexpr uint32_t QF_RESOURCE_KERNEL_HEAP_BYTES = 0;
+constexpr uint32_t QF_RESOURCE_MAIN_STACK_BYTES = 1;
+constexpr uint32_t QF_RESOURCE_BRIDGE_STACK_BYTES = 2;
+constexpr uint32_t QF_RESOURCE_DECODER_BUFFER_BYTES = 3;
+constexpr uint32_t QF_RESOURCE_REQUEST_BUFFER_BYTES = 4;
+constexpr uint32_t QF_RESOURCE_CAPABILITIES = 5;
+
+constexpr uint32_t QF_DIAGNOSTIC_REQUEST_COUNT = 0;
+constexpr uint32_t QF_DIAGNOSTIC_LOOP_ITERATIONS = 1;
+constexpr uint32_t QF_DIAGNOSTIC_MAX_LOOP_GAP_US = 2;
+constexpr uint32_t QF_DIAGNOSTIC_UPTIME_US = 3;
 
 uint8_t qf_frame[QF_MATRIX_PIXELS] = {};
 
@@ -20,16 +36,27 @@ enum class QfReverseState : uint8_t {
 QfReverseState qf_reverse_state = QfReverseState::idle;
 uint32_t qf_reverse_token = 0;
 uint32_t qf_reverse_duration_us = 0;
+atomic_t qf_request_count = ATOMIC_INIT(0);
+uint32_t qf_loop_iterations = 0;
+uint32_t qf_max_loop_gap_us = 0;
+uint32_t qf_last_loop_us = 0;
+
+void qf_count_request() {
+  atomic_inc(&qf_request_count);
+}
 
 String qf_stage1_echo(String payload) {
+  qf_count_request();
   return payload;
 }
 
 uint32_t qf_stage1_micros() {
+  qf_count_request();
   return micros();
 }
 
 uint32_t qf_stage1_matrix_draw(uint32_t seed) {
+  qf_count_request();
   for (size_t index = 0; index < QF_MATRIX_PIXELS; ++index) {
     qf_frame[index] = static_cast<uint8_t>((seed + index) & 0x07U);
   }
@@ -40,6 +67,7 @@ uint32_t qf_stage1_matrix_draw(uint32_t seed) {
 }
 
 bool qf_stage1_reverse_start(uint32_t token) {
+  qf_count_request();
   if (qf_reverse_state != QfReverseState::idle) {
     return false;
   }
@@ -51,6 +79,7 @@ bool qf_stage1_reverse_start(uint32_t token) {
 }
 
 int32_t qf_stage1_reverse_result(uint32_t token) {
+  qf_count_request();
   if (token != qf_reverse_token) {
     return -3;
   }
@@ -71,6 +100,90 @@ int32_t qf_stage1_reverse_result(uint32_t token) {
   return static_cast<int32_t>(duration_us);
 }
 
+uint32_t qf_stage1_resource_constant(uint32_t resource) {
+  switch (resource) {
+    case QF_RESOURCE_KERNEL_HEAP_BYTES:
+      return CONFIG_HEAP_MEM_POOL_SIZE;
+    case QF_RESOURCE_MAIN_STACK_BYTES:
+      return CONFIG_MAIN_STACK_SIZE;
+    case QF_RESOURCE_BRIDGE_STACK_BYTES:
+      return UPDATE_THREAD_STACK_SIZE;
+    case QF_RESOURCE_DECODER_BUFFER_BYTES:
+      return DECODER_BUFFER_SIZE;
+    case QF_RESOURCE_REQUEST_BUFFER_BYTES:
+      return BRIDGE_RPC_BUFFER_SIZE;
+    case QF_RESOURCE_CAPABILITIES: {
+      uint32_t capabilities = 0;
+#if defined(CONFIG_INIT_STACKS) && defined(CONFIG_THREAD_STACK_INFO)
+      capabilities |= 1U << 0;
+#endif
+#if defined(CONFIG_SYS_HEAP_RUNTIME_STATS)
+      capabilities |= 1U << 1;
+#endif
+#if defined(CONFIG_THREAD_RUNTIME_STATS)
+      capabilities |= 1U << 2;
+#endif
+      return capabilities;
+    }
+    default:
+      return 0;
+  }
+}
+
+uint32_t qf_stage1_largest_allocation(uint32_t allocator, uint32_t requested_cap) {
+  uint32_t cap = requested_cap;
+  if (allocator == 0) {
+    cap = min(cap, static_cast<uint32_t>(CONFIG_HEAP_MEM_POOL_SIZE));
+  } else if (allocator == 1) {
+    cap = min(cap, QF_LIBC_PROBE_MAX_BYTES);
+  } else {
+    return 0;
+  }
+
+  uint32_t low = 0;
+  uint32_t high = cap / QF_ALLOCATION_GRANULARITY;
+  while (low < high) {
+    const uint32_t middle = low + (high - low + 1) / 2;
+    const size_t bytes = middle * QF_ALLOCATION_GRANULARITY;
+    void* block = allocator == 0 ? k_malloc(bytes) : malloc(bytes);
+    if (block == nullptr) {
+      high = middle - 1;
+      continue;
+    }
+
+    if (allocator == 0) {
+      k_free(block);
+    } else {
+      free(block);
+    }
+    low = middle;
+  }
+  return low * QF_ALLOCATION_GRANULARITY;
+}
+
+uint32_t qf_stage1_diagnostic(uint32_t diagnostic) {
+  switch (diagnostic) {
+    case QF_DIAGNOSTIC_REQUEST_COUNT:
+      return static_cast<uint32_t>(atomic_get(&qf_request_count));
+    case QF_DIAGNOSTIC_LOOP_ITERATIONS:
+      return qf_loop_iterations;
+    case QF_DIAGNOSTIC_MAX_LOOP_GAP_US:
+      return qf_max_loop_gap_us;
+    case QF_DIAGNOSTIC_UPTIME_US:
+      return micros();
+    default:
+      return 0;
+  }
+}
+
+bool qf_stage1_reset_diagnostics() {
+  atomic_set(&qf_request_count, 0);
+  qf_loop_iterations = 0;
+  qf_max_loop_gap_us = 0;
+  qf_last_loop_us = micros();
+  return true;
+}
+
 void setup() {
   qf_matrix.begin();
   qf_matrix.setGrayscaleBits(3);
@@ -87,9 +200,21 @@ void setup() {
   Bridge.provide_safe("qf_stage1_matrix_draw", qf_stage1_matrix_draw);
   Bridge.provide_safe("qf_stage1_reverse_start", qf_stage1_reverse_start);
   Bridge.provide_safe("qf_stage1_reverse_result", qf_stage1_reverse_result);
+  Bridge.provide_safe("qf_stage1_resource_constant", qf_stage1_resource_constant);
+  Bridge.provide_safe("qf_stage1_largest_allocation", qf_stage1_largest_allocation);
+  Bridge.provide_safe("qf_stage1_diagnostic", qf_stage1_diagnostic);
+  Bridge.provide_safe("qf_stage1_reset_diagnostics", qf_stage1_reset_diagnostics);
 }
 
 void loop() {
+  const uint32_t loop_started_us = micros();
+  if (qf_last_loop_us != 0) {
+    const uint32_t gap_us = loop_started_us - qf_last_loop_us;
+    qf_max_loop_gap_us = max(qf_max_loop_gap_us, gap_us);
+  }
+  qf_last_loop_us = loop_started_us;
+  ++qf_loop_iterations;
+
   if (qf_reverse_state == QfReverseState::pending) {
     qf_reverse_state = QfReverseState::running;
     uint32_t echoed_token = 0;

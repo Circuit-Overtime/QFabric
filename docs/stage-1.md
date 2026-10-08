@@ -274,6 +274,45 @@ governor and frequency bounds.
 
 ## Analysis
 
+Capture an MCU resource snapshot before and after a controlled workload:
+
+```bash
+qf-stage1 resources \
+  --reset-after \
+  --output data/raw/resources/before.json
+
+# Run the controlled workload here.
+
+qf-stage1 resources \
+  --output data/raw/resources/after.json
+```
+
+The snapshot records configured kernel-heap, main-stack, Bridge-thread-stack, decoder-buffer,
+and request-buffer capacities. It also performs bounded, reversible allocation probes against
+the Zephyr kernel and C-library heaps and reports loop iterations and the worst observed main-loop
+gap since the last reset. Allocation probes report the largest successful block at 16-byte
+resolution; they are fragmentation-sensitive diagnostics, not total-free-memory measurements.
+
+The stock UNO Q Zephyr 1.0.0 image enables thread stack metadata but not initialized-stack
+watermarks, system-heap runtime statistics, or thread runtime statistics. The snapshot reports
+those capabilities explicitly as unavailable instead of estimating them. Direct queue depth is
+also unavailable through Arduino RouterBridge 0.4.3; practical queue headroom is measured by a
+separate bounded concurrency sweep.
+
+Static flash and SRAM usage remain build outputs. Capture them whenever the firmware changes:
+
+```bash
+arduino-cli compile --json \
+  --fqbn arduino:zephyr:unoq \
+  benchmarks/stage1/mcu/stage1_probe \
+  > data/raw/resources/mcu-build.json
+```
+
+In that JSON, `builder_result.executable_sections_size` is the machine-readable source for used
+and maximum program and data sizes.
+
+## Statistical analysis
+
 ```bash
 qf-stage1 analyze \
   --input data/raw/rpc-roundtrip.jsonl \

@@ -153,6 +153,109 @@ def matrix_updates(
     return with_run_id(rows)
 
 
+def _call_nonnegative_integer(
+    bridge: BridgeClient, method: str, *arguments: Any, timeout: float
+) -> int:
+    value = bridge.call(method, *arguments, timeout=timeout)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise RuntimeError(f"{method} returned an invalid value: {value!r}")
+    return value
+
+
+def resource_snapshot(
+    bridge: BridgeClient,
+    *,
+    kernel_probe_cap: int,
+    libc_probe_cap: int,
+    timeout: float,
+    reset_after: bool = False,
+) -> dict[str, object]:
+    if kernel_probe_cap <= 0 or libc_probe_cap <= 0:
+        raise ValueError("allocation probe caps must be positive")
+
+    constants = {
+        "kernel_heap_capacity_bytes": _call_nonnegative_integer(
+            bridge, "qf_stage1_resource_constant", 0, timeout=timeout
+        ),
+        "main_stack_capacity_bytes": _call_nonnegative_integer(
+            bridge, "qf_stage1_resource_constant", 1, timeout=timeout
+        ),
+        "bridge_thread_stack_capacity_bytes": _call_nonnegative_integer(
+            bridge, "qf_stage1_resource_constant", 2, timeout=timeout
+        ),
+        "rpc_decoder_buffer_bytes": _call_nonnegative_integer(
+            bridge, "qf_stage1_resource_constant", 3, timeout=timeout
+        ),
+        "rpc_request_buffer_bytes": _call_nonnegative_integer(
+            bridge, "qf_stage1_resource_constant", 4, timeout=timeout
+        ),
+    }
+    capabilities = _call_nonnegative_integer(
+        bridge, "qf_stage1_resource_constant", 5, timeout=timeout
+    )
+
+    kernel_largest = _call_nonnegative_integer(
+        bridge,
+        "qf_stage1_largest_allocation",
+        0,
+        kernel_probe_cap,
+        timeout=timeout,
+    )
+    libc_largest = _call_nonnegative_integer(
+        bridge,
+        "qf_stage1_largest_allocation",
+        1,
+        libc_probe_cap,
+        timeout=timeout,
+    )
+
+    diagnostics = {
+        "requests_since_reset": _call_nonnegative_integer(
+            bridge, "qf_stage1_diagnostic", 0, timeout=timeout
+        ),
+        "loop_iterations_since_reset": _call_nonnegative_integer(
+            bridge, "qf_stage1_diagnostic", 1, timeout=timeout
+        ),
+        "maximum_loop_gap_us": _call_nonnegative_integer(
+            bridge, "qf_stage1_diagnostic", 2, timeout=timeout
+        ),
+        "uptime_us_modulo_2_32": _call_nonnegative_integer(
+            bridge, "qf_stage1_diagnostic", 3, timeout=timeout
+        ),
+    }
+
+    if reset_after:
+        reset = bridge.call("qf_stage1_reset_diagnostics", timeout=timeout)
+        if reset is not True:
+            raise RuntimeError(f"qf_stage1_reset_diagnostics returned an invalid result: {reset!r}")
+
+    return {
+        "schema_version": 1,
+        "captured_utc": utc_now(),
+        "constants": constants,
+        "capabilities": {
+            "stack_watermark": bool(capabilities & (1 << 0)),
+            "system_heap_runtime_statistics": bool(capabilities & (1 << 1)),
+            "thread_runtime_statistics": bool(capabilities & (1 << 2)),
+        },
+        "allocation_probes": {
+            "kernel": {
+                "probe_cap_bytes": kernel_probe_cap,
+                "largest_success_bytes": kernel_largest,
+                "cap_reached": kernel_largest >= kernel_probe_cap,
+            },
+            "libc": {
+                "probe_cap_bytes": libc_probe_cap,
+                "largest_success_bytes": libc_largest,
+                "cap_reached": libc_largest >= libc_probe_cap,
+            },
+            "granularity_bytes": 16,
+        },
+        "diagnostics": diagnostics,
+        "diagnostics_reset_after_capture": reset_after,
+    }
+
+
 def mcu_to_linux_roundtrips(
     bridge: BridgeClient, *, iterations: int, warmup: int, timeout: float
 ) -> Iterator[Measurement]:

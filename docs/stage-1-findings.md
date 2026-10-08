@@ -13,6 +13,9 @@ idle and CPU-loaded behavior of one Arduino UNO Q configuration and identify fol
   governor wrapper.
 - Idle concurrency campaign: `stage1-concurrency-idle`, QFabric commit `931dbb8`, three
   repetitions each at 1, 2, 4, and 8 workers with an 8-byte payload.
+- CPU-loaded concurrency campaign: `stage1-concurrency-cpu-loaded`, QFabric commit `bc559fb`,
+  the same repetitions, worker levels, and payload. Its four `stress-ng` CPU workers completed
+  successfully over 138.12 seconds with no failed or untrustworthy stress metrics.
 - Each of the four conditions contains 24,000 recorded samples with zero failures, including
   3,000 MCU-initiated round trips: 96,000 samples in total.
 - Loaded profile: `stress-ng --cpu 4 --cpu-method all`, successful for 414.70 seconds.
@@ -63,6 +66,16 @@ statistics.
 | `performance`, CPU-loaded | 10.57 | 14.29 | 16.17 | 9.76 |
 | `performance` loaded change | +29.9% | +20.2% | +35.2% | +4.5% |
 
+Concurrency results report the mean of each campaign's three repetition-level values. Throughput
+is measured from the complete batch wall time rather than inferred from mean per-call latency.
+
+| Workers | Idle success/s | Loaded success/s | Change | Idle p50 ms | Loaded p50 ms | Idle p99 ms | Loaded p99 ms |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 96.75 | 104.67 | +8.2% | 9.42 | 8.46 | 10.63 | 13.63 |
+| 2 | 148.15 | 155.99 | +5.3% | 12.08 | 10.97 | 13.51 | 16.63 |
+| 4 | 205.68 | 212.00 | +3.1% | 17.12 | 16.10 | 19.28 | 21.99 |
+| 8 | 257.31 | 261.92 | +1.8% | 26.25 | 25.84 | 30.74 | 33.79 |
+
 ## Observations
 
 - Under `schedutil`, CPU load reduced Linux-initiated median latency by 2.5% to 20.1%, but
@@ -106,6 +119,16 @@ statistics.
   increased from 9.42 ms to 26.25 ms and mean p99 from 10.63 ms to 30.74 ms. Throughput varied by
   less than 1% within every worker level, supporting repeatability. Scaling is beneficial but
   sublinear; eight workers are the highest verified level, not an asserted saturation boundary.
+- The matched loaded concurrency campaign also completed 12,000 calls without failures or health
+  loss. Load increased aggregate throughput by 1.8% to 8.2% and reduced median per-call latency by
+  1.6% to 10.2%, consistent with the earlier `schedutil` frequency-response observation. It still
+  increased p99 by 9.9% to 28.2% depending on worker count. One two-worker call reached 115.82 ms,
+  compared with a 22.09 ms maximum at one worker in the idle campaign. CPU load therefore improves
+  central throughput while worsening tail risk; later contracts must not be selected from the
+  throughput or median alone.
+- Every post-level diagnostic reported exactly 1,101 requests since reset: 100 warmups, 1,000
+  measured calls, and one health check. The largest observed MCU main-loop gap was 5.224 ms at
+  idle and 5.222 ms under load, and all 24 post-level health checks passed.
 
 ## Required follow-up
 

@@ -74,13 +74,14 @@ Install missing components only if the checks show they are absent:
 
 ```bash
 arduino-cli core install arduino:zephyr
-arduino-cli lib update-index
-arduino-cli lib install Arduino_RouterBridge
 ```
 
 `Arduino_LED_Matrix` is supplied through the UNO Q Zephyr platform. `Arduino_RouterBridge`
-is a separate official Arduino library and must appear in `arduino-cli lib list`. Do not
-substitute similarly named third-party Bridge or matrix libraries.
+is a separate official Arduino library. The benchmark's default `sketch.yaml` profile pins
+the core, RouterBridge, and its dependency chain and downloads them into Arduino CLI's isolated
+profile cache during compilation. A global Library Manager installation is useful for examples
+but is not required or used by the isolated profile build. Do not substitute similarly named
+third-party Bridge or matrix libraries.
 
 ## Compile and flash the MCU probe
 

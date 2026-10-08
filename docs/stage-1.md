@@ -236,6 +236,42 @@ the exact profile and stress metrics, runs the campaign, and terminates only the
 started. `QF_STRESS_CPU_WORKERS` and `QF_STRESS_WARMUP_SECONDS` override those defaults. Later
 runs may add memory and I/O contention, but each load profile must be recorded separately.
 
+## Controlled CPU frequency
+
+Use the `performance` governor for matched idle and loaded campaigns to separate the observed
+`schedutil` frequency response from scheduling contention. Authenticate `sudo` before detaching
+the command; the wrapper deliberately refuses to prompt after it starts:
+
+```bash
+sudo -v
+
+QF_REPETITIONS=3 QF_ITERATIONS=1000 QF_WARMUP=100 \
+  bash scripts/run-stage1-governor-campaign.sh \
+  performance idle stage1-performance-idle
+
+sudo -v
+
+QF_REPETITIONS=3 QF_ITERATIONS=1000 QF_WARMUP=100 \
+  bash scripts/run-stage1-governor-campaign.sh \
+  performance cpu-loaded stage1-performance-cpu-loaded
+```
+
+The wrapper records every original policy governor, verifies that the requested governor is
+available, keeps its non-interactive sudo authorization alive, and restores the original values
+on success, failure, interruption, or SSH hangup. It gives the campaigns distinct
+`idle-performance` and `cpu-loaded-performance` condition names. After each run, verify the
+restoration:
+
+```bash
+for policy in /sys/devices/system/cpu/cpufreq/policy*; do
+  echo "$policy: $(cat "$policy/scaling_governor")"
+done
+```
+
+A power loss or kernel crash cannot execute shell cleanup; reboot the board before further
+measurements if either occurs. The environment capture inside each campaign records the active
+governor and frequency bounds.
+
 ## Analysis
 
 ```bash

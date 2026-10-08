@@ -7,11 +7,15 @@ cd "$repository_root"
 run_label="${1:-$(date --utc +%Y%m%dT%H%M%SZ)}"
 cpu_workers="${QF_STRESS_CPU_WORKERS:-4}"
 load_warmup_seconds="${QF_STRESS_WARMUP_SECONDS:-10}"
+condition="${QF_CONDITION:-cpu-loaded}"
+load_description_suffix="${QF_LOAD_DESCRIPTION_SUFFIX:-}"
 
-if [[ ! "$run_label" =~ ^[A-Za-z0-9._-]+$ ]]; then
-  echo "run label may contain only letters, numbers, dots, underscores, and hyphens" >&2
-  exit 1
-fi
+for value in "$run_label" "$condition"; do
+  if [[ ! "$value" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "condition and run label may contain only letters, numbers, dots, underscores, and hyphens" >&2
+    exit 1
+  fi
+done
 
 for value in "$cpu_workers" "$load_warmup_seconds"; do
   if [[ ! "$value" =~ ^[1-9][0-9]*$ ]]; then
@@ -54,15 +58,15 @@ if ! kill -0 "$stress_pid" 2>/dev/null; then
 fi
 
 set +e
-QF_LOAD_DESCRIPTION="stress-ng --cpu $cpu_workers --cpu-method all" \
-  bash scripts/run-stage1-campaign.sh cpu-loaded "$run_label"
+QF_LOAD_DESCRIPTION="stress-ng --cpu $cpu_workers --cpu-method all$load_description_suffix" \
+  bash scripts/run-stage1-campaign.sh "$condition" "$run_label"
 campaign_exit_code=$?
 set -e
 
 stop_stress
 stress_pid=""
 
-campaign_root="data/raw/campaigns/cpu-loaded/$run_label"
+campaign_root="data/raw/campaigns/$condition/$run_label"
 if [[ -d "$campaign_root" ]]; then
   cp "$stress_log" "$campaign_root/stress-ng.log"
 fi

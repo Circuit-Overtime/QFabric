@@ -355,6 +355,63 @@ QF_CONCURRENCY_LEVELS="1 2 4 8" \
 `QF_STRESS_CPU_WORKERS` and `QF_STRESS_WARMUP_SECONDS` override the four-worker and ten-second
 defaults. Keep them unchanged for a direct comparison with `stage1-concurrency-idle`.
 
+## LED matrix activity profiles
+
+The LED experiment separates three MCU states supported by `Arduino_LED_Matrix`: the matrix
+driver stopped with `end()`, the driver scanning a static frame, and the driver scanning while
+QFabric writes changing frames at a controlled rate. The first hardware pass should test each
+state individually and verify Bridge health after every transition:
+
+```bash
+qf-stage1 run led-profile \
+  --led-mode disabled \
+  --payload-size 8 \
+  --iterations 20 \
+  --warmup 5 \
+  --timeout 2 \
+  --output data/raw/smoke/led-disabled.jsonl \
+  --profile-output data/raw/smoke/led-disabled-profile.json
+
+qf-stage1 check --timeout 2
+
+qf-stage1 run led-profile \
+  --led-mode static \
+  --payload-size 8 \
+  --iterations 20 \
+  --warmup 5 \
+  --timeout 2 \
+  --output data/raw/smoke/led-static.jsonl \
+  --profile-output data/raw/smoke/led-static-profile.json
+
+qf-stage1 check --timeout 2
+
+qf-stage1 run led-profile \
+  --led-mode refresh \
+  --refresh-hz 60 \
+  --payload-size 8 \
+  --iterations 20 \
+  --warmup 5 \
+  --timeout 2 \
+  --output data/raw/smoke/led-refresh-60hz.jsonl \
+  --profile-output data/raw/smoke/led-refresh-60hz-profile.json
+
+qf-stage1 check --timeout 2
+```
+
+Every run disables the matrix in cleanup, including after a measurement error. The profile JSON
+records the requested mode and rate, actual frame-write count, observed write rate, and maximum
+MCU-local `draw()` duration. After the smoke transitions pass, run the complete campaign:
+
+```bash
+QF_REPETITIONS=3 QF_ITERATIONS=1000 QF_WARMUP=100 \
+  bash scripts/run-stage1-led-profile-campaign.sh \
+  stage1-led-profiles-idle
+```
+
+The controlled 10, 30, and 60 Hz values are application frame-write rates, not claims about the
+panel's optical scan or PWM frequency. The experiment measures whether driver state and changing
+frame traffic affect Bridge latency, MCU loop gaps, or health.
+
 Static flash and SRAM usage remain build outputs. Capture them whenever the firmware changes:
 
 ```bash

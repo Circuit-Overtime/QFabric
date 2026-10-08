@@ -18,6 +18,16 @@ constexpr uint32_t QF_DIAGNOSTIC_LOOP_ITERATIONS = 1;
 constexpr uint32_t QF_DIAGNOSTIC_MAX_LOOP_GAP_US = 2;
 constexpr uint32_t QF_DIAGNOSTIC_UPTIME_US = 3;
 
+constexpr uint32_t QF_MATRIX_PROFILE_DISABLED = 0;
+constexpr uint32_t QF_MATRIX_PROFILE_STATIC = 1;
+constexpr uint32_t QF_MATRIX_PROFILE_REFRESH = 2;
+constexpr uint32_t QF_MATRIX_PROFILE_MAX_REFRESH_HZ = 120;
+
+constexpr uint32_t QF_MATRIX_PROFILE_DIAGNOSTIC_MODE = 0;
+constexpr uint32_t QF_MATRIX_PROFILE_DIAGNOSTIC_TARGET_HZ = 1;
+constexpr uint32_t QF_MATRIX_PROFILE_DIAGNOSTIC_UPDATE_COUNT = 2;
+constexpr uint32_t QF_MATRIX_PROFILE_DIAGNOSTIC_MAX_DRAW_US = 3;
+
 uint8_t qf_frame[QF_MATRIX_PIXELS] = {};
 
 enum class QfReverseState : uint8_t {
@@ -35,6 +45,14 @@ atomic_t qf_request_count = ATOMIC_INIT(0);
 uint32_t qf_loop_iterations = 0;
 uint32_t qf_max_loop_gap_us = 0;
 uint32_t qf_last_loop_us = 0;
+bool qf_matrix_enabled = false;
+uint32_t qf_matrix_profile_mode = QF_MATRIX_PROFILE_STATIC;
+uint32_t qf_matrix_target_refresh_hz = 0;
+uint32_t qf_matrix_refresh_interval_us = 0;
+uint32_t qf_matrix_last_refresh_us = 0;
+uint32_t qf_matrix_refresh_count = 0;
+uint32_t qf_matrix_max_draw_us = 0;
+uint32_t qf_matrix_seed = 0;
 
 void qf_count_request() {
   atomic_inc(&qf_request_count);
@@ -45,6 +63,28 @@ String qf_stage1_echo(String payload) {
   return payload;
 }
 
+void qf_matrix_enable() {
+  if (!qf_matrix_enabled) {
+    qf_matrix.begin();
+    qf_matrix.setGrayscaleBits(3);
+    qf_matrix_enabled = true;
+  }
+}
+
+void qf_matrix_fill_frame(uint32_t seed) {
+  for (size_t index = 0; index < QF_MATRIX_PIXELS; ++index) {
+    qf_frame[index] = static_cast<uint8_t>((seed + index) & 0x07U);
+  }
+}
+
+uint32_t qf_matrix_draw_frame(uint32_t seed) {
+  qf_matrix_enable();
+  qf_matrix_fill_frame(seed);
+  const uint32_t started = micros();
+  qf_matrix.draw(qf_frame);
+  return micros() - started;
+}
+
 uint32_t qf_stage1_micros() {
   qf_count_request();
   return micros();
@@ -52,13 +92,59 @@ uint32_t qf_stage1_micros() {
 
 uint32_t qf_stage1_matrix_draw(uint32_t seed) {
   qf_count_request();
-  for (size_t index = 0; index < QF_MATRIX_PIXELS; ++index) {
-    qf_frame[index] = static_cast<uint8_t>((seed + index) & 0x07U);
+  return qf_matrix_draw_frame(seed);
+}
+
+bool qf_stage1_matrix_profile_configure(uint32_t mode, uint32_t refresh_hz) {
+  qf_count_request();
+  if (mode > QF_MATRIX_PROFILE_REFRESH) {
+    return false;
+  }
+  if (mode != QF_MATRIX_PROFILE_REFRESH && refresh_hz != 0) {
+    return false;
+  }
+  if (mode == QF_MATRIX_PROFILE_REFRESH &&
+      (refresh_hz == 0 || refresh_hz > QF_MATRIX_PROFILE_MAX_REFRESH_HZ)) {
+    return false;
   }
 
-  const uint32_t started = micros();
-  qf_matrix.draw(qf_frame);
-  return micros() - started;
+  qf_matrix_refresh_count = 0;
+  qf_matrix_max_draw_us = 0;
+  qf_matrix_seed = 0;
+  qf_matrix_target_refresh_hz = refresh_hz;
+  qf_matrix_refresh_interval_us =
+      refresh_hz == 0 ? 0 : 1000000U / refresh_hz;
+  qf_matrix_last_refresh_us = micros();
+  qf_matrix_profile_mode = mode;
+
+  if (mode == QF_MATRIX_PROFILE_DISABLED) {
+    if (qf_matrix_enabled) {
+      qf_matrix.clear();
+      qf_matrix.end();
+      qf_matrix_enabled = false;
+    }
+    return true;
+  }
+
+  qf_matrix_enable();
+  qf_matrix_draw_frame(0);
+  return true;
+}
+
+uint32_t qf_stage1_matrix_profile_diagnostic(uint32_t diagnostic) {
+  qf_count_request();
+  switch (diagnostic) {
+    case QF_MATRIX_PROFILE_DIAGNOSTIC_MODE:
+      return qf_matrix_profile_mode;
+    case QF_MATRIX_PROFILE_DIAGNOSTIC_TARGET_HZ:
+      return qf_matrix_target_refresh_hz;
+    case QF_MATRIX_PROFILE_DIAGNOSTIC_UPDATE_COUNT:
+      return qf_matrix_refresh_count;
+    case QF_MATRIX_PROFILE_DIAGNOSTIC_MAX_DRAW_US:
+      return qf_matrix_max_draw_us;
+    default:
+      return 0;
+  }
 }
 
 bool qf_stage1_reverse_start(uint32_t token) {
@@ -150,6 +236,7 @@ bool qf_stage1_reset_diagnostics() {
 
 void setup() {
   qf_matrix.begin();
+  qf_matrix_enabled = true;
   qf_matrix.setGrayscaleBits(3);
   qf_matrix.clear();
 
@@ -162,6 +249,10 @@ void setup() {
   Bridge.provide("qf_stage1_echo", qf_stage1_echo);
   Bridge.provide("qf_stage1_micros", qf_stage1_micros);
   Bridge.provide_safe("qf_stage1_matrix_draw", qf_stage1_matrix_draw);
+  Bridge.provide_safe("qf_stage1_matrix_profile_configure",
+                      qf_stage1_matrix_profile_configure);
+  Bridge.provide_safe("qf_stage1_matrix_profile_diagnostic",
+                      qf_stage1_matrix_profile_diagnostic);
   Bridge.provide_safe("qf_stage1_reverse_start", qf_stage1_reverse_start);
   Bridge.provide_safe("qf_stage1_reverse_result", qf_stage1_reverse_result);
   Bridge.provide_safe("qf_stage1_resource_constant", qf_stage1_resource_constant);
@@ -188,6 +279,15 @@ void loop() {
     qf_reverse_state = succeeded && echoed_token == qf_reverse_token
                            ? QfReverseState::ready
                            : QfReverseState::error;
+  }
+
+  if (qf_matrix_profile_mode == QF_MATRIX_PROFILE_REFRESH &&
+      qf_matrix_refresh_interval_us > 0 &&
+      loop_started_us - qf_matrix_last_refresh_us >= qf_matrix_refresh_interval_us) {
+    qf_matrix_last_refresh_us = loop_started_us;
+    const uint32_t draw_us = qf_matrix_draw_frame(++qf_matrix_seed);
+    qf_matrix_max_draw_us = max(qf_matrix_max_draw_us, draw_us);
+    ++qf_matrix_refresh_count;
   }
 
   delay(1);

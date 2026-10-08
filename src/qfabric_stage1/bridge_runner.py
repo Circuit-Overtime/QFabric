@@ -10,6 +10,8 @@ from typing import Any, Protocol
 
 from .model import Measurement
 
+MATRIX_PROFILE_MODES = {"disabled": 0, "static": 1, "refresh": 2}
+
 
 class BridgeClient(Protocol):
     def call(self, method: str, *args: Any, timeout: float = 5) -> Any: ...
@@ -226,6 +228,72 @@ def matrix_updates(
         warmup=warmup,
         timeout=timeout,
         validate=lambda value, _sequence: isinstance(value, int) and value >= 0,
+    )
+    return with_run_id(rows)
+
+
+def configure_matrix_profile(
+    bridge: BridgeClient, *, mode: str, refresh_hz: int, timeout: float
+) -> None:
+    if mode not in MATRIX_PROFILE_MODES:
+        raise ValueError(f"unsupported matrix profile mode: {mode}")
+    if mode == "refresh":
+        if not 1 <= refresh_hz <= 120:
+            raise ValueError("refresh profile rate must be between 1 and 120 Hz")
+    elif refresh_hz != 0:
+        raise ValueError("disabled and static matrix profiles require a zero refresh rate")
+
+    configured = bridge.call(
+        "qf_stage1_matrix_profile_configure",
+        MATRIX_PROFILE_MODES[mode],
+        refresh_hz,
+        timeout=timeout,
+    )
+    if configured is not True:
+        raise RuntimeError(
+            f"MCU rejected matrix profile mode={mode!r}, refresh_hz={refresh_hz}"
+        )
+
+
+def matrix_profile_snapshot(bridge: BridgeClient, *, timeout: float) -> dict[str, int]:
+    values = [
+        _call_nonnegative_integer(
+            bridge, "qf_stage1_matrix_profile_diagnostic", selector, timeout=timeout
+        )
+        for selector in range(4)
+    ]
+    return {
+        "mode_id": values[0],
+        "target_refresh_hz": values[1],
+        "update_count": values[2],
+        "maximum_draw_us": values[3],
+    }
+
+
+def matrix_profile_roundtrips(
+    bridge: BridgeClient,
+    *,
+    mode: str,
+    refresh_hz: int,
+    payload_size: int,
+    iterations: int,
+    warmup: int,
+    timeout: float,
+) -> Iterator[Measurement]:
+    if mode not in MATRIX_PROFILE_MODES:
+        raise ValueError(f"unsupported matrix profile mode: {mode}")
+    profile_name = mode if mode != "refresh" else f"refresh-{refresh_hz}hz"
+    payload = payload_for_size(payload_size)
+    rows = _measure_calls(
+        bridge,
+        experiment=f"led-profile-{profile_name}",
+        method="qf_stage1_echo",
+        arguments=lambda _sequence: (payload,),
+        iterations=iterations,
+        warmup=warmup,
+        timeout=timeout,
+        payload_bytes=len(payload.encode()),
+        validate=lambda value, _sequence: value == payload,
     )
     return with_run_id(rows)
 

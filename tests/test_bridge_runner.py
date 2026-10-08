@@ -5,6 +5,9 @@ import unittest
 from qfabric_stage1.bridge_runner import (
     check_bridge,
     concurrent_roundtrips,
+    configure_matrix_profile,
+    matrix_profile_roundtrips,
+    matrix_profile_snapshot,
     mcu_to_linux_roundtrips,
     payload_for_size,
     resource_snapshot,
@@ -92,6 +95,22 @@ class FakeConcurrentBridge:
         return args[0]
 
 
+class FakeMatrixProfileBridge:
+    def __init__(self):
+        self.mode = 0
+        self.refresh_hz = 0
+
+    def call(self, method, *args, timeout=5):
+        if method == "qf_stage1_matrix_profile_configure":
+            self.mode, self.refresh_hz = args
+            return True
+        if method == "qf_stage1_matrix_profile_diagnostic":
+            return (self.mode, self.refresh_hz, 42, 9)[args[0]]
+        if method == "qf_stage1_echo":
+            return args[0]
+        raise AssertionError(method)
+
+
 class BridgeRunnerTests(unittest.TestCase):
     def test_bridge_health_check(self) -> None:
         check_bridge(FakeBridge(), timeout=1)
@@ -168,6 +187,36 @@ class BridgeRunnerTests(unittest.TestCase):
         self.assertEqual(len({row.batch_elapsed_ns for row in rows}), 1)
         self.assertGreater(rows[0].batch_elapsed_ns, 0)
         self.assertEqual(bridge.maximum_active, 3)
+
+    def test_matrix_refresh_profile_configuration_and_measurement(self) -> None:
+        bridge = FakeMatrixProfileBridge()
+        configure_matrix_profile(bridge, mode="refresh", refresh_hz=30, timeout=1)
+        rows = list(
+            matrix_profile_roundtrips(
+                bridge,
+                mode="refresh",
+                refresh_hz=30,
+                payload_size=8,
+                iterations=3,
+                warmup=1,
+                timeout=1,
+            )
+        )
+        snapshot = matrix_profile_snapshot(bridge, timeout=1)
+
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all(row.experiment == "led-profile-refresh-30hz" for row in rows))
+        self.assertTrue(all(row.outcome == "ok" for row in rows))
+        self.assertEqual(snapshot["target_refresh_hz"], 30)
+        self.assertEqual(snapshot["update_count"], 42)
+        self.assertEqual(snapshot["maximum_draw_us"], 9)
+
+    def test_matrix_profile_rejects_invalid_rate(self) -> None:
+        bridge = FakeMatrixProfileBridge()
+        with self.assertRaises(ValueError):
+            configure_matrix_profile(bridge, mode="static", refresh_hz=30, timeout=1)
+        with self.assertRaises(ValueError):
+            configure_matrix_profile(bridge, mode="refresh", refresh_hz=121, timeout=1)
 
 
 if __name__ == "__main__":

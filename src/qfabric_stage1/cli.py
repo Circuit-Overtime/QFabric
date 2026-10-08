@@ -3,14 +3,19 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from collections.abc import Iterable
 from pathlib import Path
 
 from .analysis import analyze
 from .bridge_runner import (
+    MATRIX_PROFILE_MODES,
     check_bridge,
     clock_samples,
     concurrent_roundtrips,
+    configure_matrix_profile,
+    matrix_profile_roundtrips,
+    matrix_profile_snapshot,
     matrix_updates,
     mcu_to_linux_roundtrips,
     resource_snapshot,
@@ -41,7 +46,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = subparsers.add_parser("run", help="run one hardware benchmark")
     run.add_argument(
-        "experiment", choices=("roundtrip", "concurrency", "reverse", "clock", "matrix")
+        "experiment",
+        choices=("roundtrip", "concurrency", "reverse", "clock", "matrix", "led-profile"),
     )
     run.add_argument("--output", type=Path, required=True)
     run.add_argument("--iterations", type=positive_integer, default=1000)
@@ -49,6 +55,9 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--timeout", type=float, default=5.0)
     run.add_argument("--payload-size", type=nonnegative_integer, default=0)
     run.add_argument("--workers", type=positive_integer, default=1)
+    run.add_argument("--led-mode", choices=("disabled", "static", "refresh"))
+    run.add_argument("--refresh-hz", type=nonnegative_integer, default=0)
+    run.add_argument("--profile-output", type=Path)
     run.add_argument("--address", default="unix:///var/run/arduino-router.sock")
 
     check = subparsers.add_parser("check", help="verify Router and MCU benchmark availability")
@@ -116,6 +125,7 @@ def print_summary(rows: Iterable[Measurement]) -> list[Measurement]:
 
 def run_hardware(args: argparse.Namespace) -> int:
     bridge = connect_bridge(args.address)
+    matrix_profile_configured = False
     try:
         if args.experiment == "roundtrip":
             rows = roundtrip(
@@ -148,18 +158,71 @@ def run_hardware(args: argparse.Namespace) -> int:
                 warmup=args.warmup,
                 timeout=args.timeout,
             )
-        else:
+        elif args.experiment == "matrix":
             rows = matrix_updates(
                 bridge,
                 iterations=args.iterations,
                 warmup=args.warmup,
                 timeout=args.timeout,
             )
+        else:
+            if args.led_mode is None or args.profile_output is None:
+                raise ValueError(
+                    "led-profile requires --led-mode and --profile-output"
+                )
+            configure_matrix_profile(
+                bridge,
+                mode=args.led_mode,
+                refresh_hz=args.refresh_hz,
+                timeout=args.timeout,
+            )
+            matrix_profile_configured = True
+            profile_started_ns = time.perf_counter_ns()
+            rows = matrix_profile_roundtrips(
+                bridge,
+                mode=args.led_mode,
+                refresh_hz=args.refresh_hz,
+                payload_size=args.payload_size,
+                iterations=args.iterations,
+                warmup=args.warmup,
+                timeout=args.timeout,
+            )
 
         collected = print_summary(rows)
+        if matrix_profile_configured:
+            profile_elapsed_ns = time.perf_counter_ns() - profile_started_ns
+            profile = matrix_profile_snapshot(bridge, timeout=args.timeout)
+            if profile["mode_id"] != MATRIX_PROFILE_MODES[args.led_mode]:
+                raise RuntimeError("MCU reported an unexpected matrix profile mode")
+            if profile["target_refresh_hz"] != args.refresh_hz:
+                raise RuntimeError("MCU reported an unexpected matrix profile refresh rate")
+            profile.update(
+                {
+                    "schema_version": 1,
+                    "mode": args.led_mode,
+                    "profile_elapsed_ns": profile_elapsed_ns,
+                    "observed_refresh_hz": (
+                        profile["update_count"] * 1_000_000_000 / profile_elapsed_ns
+                        if args.led_mode == "refresh" and profile_elapsed_ns > 0
+                        else None
+                    ),
+                }
+            )
+            args.profile_output.parent.mkdir(parents=True, exist_ok=True)
+            args.profile_output.write_text(
+                json.dumps(profile, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            print(json.dumps(profile, indent=2, sort_keys=True))
         append_measurements(args.output, collected)
         return 0 if all(row.outcome == "ok" for row in collected) else 2
     finally:
+        if matrix_profile_configured:
+            configure_matrix_profile(
+                bridge,
+                mode="disabled",
+                refresh_hz=0,
+                timeout=args.timeout,
+            )
         bridge.disconnect()
 
 

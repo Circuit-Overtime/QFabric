@@ -24,6 +24,11 @@ if [[ ! -S /var/run/arduino-router.sock ]]; then
   exit 1
 fi
 
+if ! qf-stage1 check --timeout 2; then
+  echo "Stage 1 MCU methods are unavailable; recover or re-upload the firmware" >&2
+  exit 1
+fi
+
 output_dir="data/raw/smoke/$run_label"
 if [[ -e "$output_dir" ]]; then
   echo "refusing to overwrite existing run directory: $output_dir" >&2

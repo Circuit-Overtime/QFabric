@@ -39,6 +39,11 @@ if [[ ! -S /var/run/arduino-router.sock ]]; then
   exit 1
 fi
 
+if ! qf-stage1 check --timeout 2; then
+  echo "Stage 1 MCU methods are unavailable; recover or re-upload the firmware" >&2
+  exit 1
+fi
+
 campaign_root="data/raw/campaigns/$condition/$run_label"
 processed_root="data/processed/campaigns/$condition/$run_label"
 if [[ -e "$campaign_root" || -e "$processed_root" ]]; then

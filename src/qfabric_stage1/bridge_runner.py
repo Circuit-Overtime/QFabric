@@ -13,6 +13,13 @@ class BridgeClient(Protocol):
     def call(self, method: str, *args: Any, timeout: float = 5) -> Any: ...
 
 
+def check_bridge(bridge: BridgeClient, *, timeout: float) -> None:
+    payload = "qfabric-health-check"
+    value = bridge.call("qf_stage1_echo", payload, timeout=timeout)
+    if value != payload:
+        raise RuntimeError(f"Bridge health check returned an invalid result: {value!r}")
+
+
 def utc_now() -> str:
     return datetime.now(UTC).isoformat()
 

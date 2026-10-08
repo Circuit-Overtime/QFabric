@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from .analysis import analyze
-from .bridge_runner import clock_samples, matrix_updates, roundtrip
+from .bridge_runner import check_bridge, clock_samples, matrix_updates, roundtrip
 from .io import append_measurements
 from .model import Measurement
 from .statistics import summarize
@@ -39,6 +39,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--timeout", type=float, default=5.0)
     run.add_argument("--payload-size", type=nonnegative_integer, default=0)
     run.add_argument("--address", default="unix:///var/run/arduino-router.sock")
+
+    check = subparsers.add_parser("check", help="verify Router and MCU benchmark availability")
+    check.add_argument("--timeout", type=float, default=2.0)
+    check.add_argument("--address", default="unix:///var/run/arduino-router.sock")
 
     analysis = subparsers.add_parser("analyze", help="summarize JSONL measurements")
     analysis.add_argument("--input", type=Path, required=True)
@@ -99,6 +103,16 @@ def run_hardware(args: argparse.Namespace) -> int:
         bridge.disconnect()
 
 
+def check_hardware(args: argparse.Namespace) -> int:
+    bridge = connect_bridge(args.address)
+    try:
+        check_bridge(bridge, timeout=args.timeout)
+        print("Stage 1 Bridge health check passed")
+        return 0
+    finally:
+        bridge.disconnect()
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
@@ -106,6 +120,8 @@ def main(argv: list[str] | None = None) -> int:
             result = analyze(args.input, args.json, args.csv)
             print(json.dumps(result, indent=2, sort_keys=True))
             return 0
+        if args.command == "check":
+            return check_hardware(args)
         return run_hardware(args)
     except (OSError, RuntimeError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)

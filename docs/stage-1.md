@@ -125,7 +125,11 @@ Do not open `/dev/ttyHS1` directly. It is reserved by `arduino-router`.
 systemctl status arduino-router --no-pager
 systemctl show arduino-router --property=ExecStart --no-pager
 stat /var/run/arduino-router.sock
+qf-stage1 check
 ```
+
+The health check verifies both the Linux Router connection and registration of the Stage 1 MCU
+echo method. Campaign and smoke scripts refuse to start if that method is unavailable.
 
 Capture the environment before each firmware/software change:
 

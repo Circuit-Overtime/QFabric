@@ -1,6 +1,6 @@
 import unittest
 
-from qfabric_stage1.bridge_runner import payload_for_size, roundtrip
+from qfabric_stage1.bridge_runner import check_bridge, payload_for_size, roundtrip
 
 
 class FakeBridge:
@@ -11,6 +11,9 @@ class FakeBridge:
 
 
 class BridgeRunnerTests(unittest.TestCase):
+    def test_bridge_health_check(self) -> None:
+        check_bridge(FakeBridge(), timeout=1)
+
     def test_payload_size(self) -> None:
         self.assertEqual(len(payload_for_size(32).encode()), 32)
         with self.assertRaises(ValueError):

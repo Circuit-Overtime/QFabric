@@ -19,6 +19,8 @@ idle and CPU-loaded behavior of one Arduino UNO Q configuration and identify fol
 - Idle LED activity campaign: `stage1-led-profiles-idle`, QFabric commit `c091c2b`, three
   repetitions each with matrix scanning disabled, a static enabled frame, and changing frames
   requested at 10, 30, and 60 Hz.
+- Idle clock-alignment campaign: `stage1-clock-alignment-idle`, QFabric commit `708c081`, three
+  repetitions of 600 samples at 500 ms spacing. Each repetition spanned about 305.2 seconds.
 - Each of the four conditions contains 24,000 recorded samples with zero failures, including
   3,000 MCU-initiated round trips: 96,000 samples in total.
 - Loaded profile: `stress-ng --cpu 4 --cpu-method all`, successful for 414.70 seconds.
@@ -90,6 +92,16 @@ application frame writes measured by the MCU; they are not the panel's optical s
 | 30 Hz requested (28.83 Hz) | 9.73 | 10.41 | 10.62 | 12.96 | 103.49 |
 | 60 Hz requested (55.67 Hz) | 9.74 | 10.40 | 10.60 | 11.36 | 103.41 |
 
+Clock drift is the slope of Linux-monotonic-minus-MCU time against Linux elapsed time. Positive
+values mean Linux monotonic time advances faster. Each endpoint interval uses the lowest-latency
+sample in the first and last 10% windows; alignment uncertainty is half the complete RPC interval.
+
+| Repetition | Regression drift ppm | Endpoint lower ppm | Endpoint upper ppm | Best uncertainty ms | Median uncertainty ms | p99 uncertainty ms |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 947.71 | 918.77 | 976.44 | 3.81 | 4.44 | 4.70 |
+| 2 | 924.25 | 891.45 | 954.18 | 3.77 | 4.45 | 4.73 |
+| 3 | 913.90 | 891.66 | 946.08 | 3.71 | 4.45 | 4.67 |
+
 ## Observations
 
 - Under `schedutil`, CPU load reduced Linux-initiated median latency by 2.5% to 20.1%, but
@@ -153,11 +165,20 @@ application frame writes measured by the MCU; they are not the panel's optical s
   deadlines reduce achieved rate. The worst local `Arduino_LED_Matrix.draw()` call was 18 us,
   while post-profile maximum loop gaps ranged from 3.711 to 4.041 ms. These measurements do not
   establish optical refresh or PWM timing.
+- All 1,800 long-duration clock-alignment samples completed without failure or health loss. The
+  three regression estimates ranged from 913.90 to 947.71 ppm, with a mean of 928.62 ppm. All
+  endpoint-derived intervals overlap from 918.77 to 946.08 ppm, supporting a persistent clock-rate
+  difference rather than short-run RPC noise. At the mean estimate, uncorrected Linux-versus-MCU
+  offset changes by about 0.93 ms/s, or 279 ms over five minutes.
+- The lowest observed per-sample alignment uncertainty ranged from +/-3.71 to +/-3.81 ms across
+  repetitions, and median uncertainty was about +/-4.44 ms. Drift correction is therefore
+  necessary for comparisons over time, but this RPC bracketing method still cannot justify a
+  sub-millisecond one-way latency claim. No MCU 32-bit microsecond wrap occurred during an
+  individual run; the analyzer's wrap path remains covered by synthetic tests.
 
 ## Required follow-up
 
 - Implement reset-safe payload boundary probing above 128 bytes.
 - Explain the loaded reverse-path distribution with Router or scheduler tracing and continuous
   frequency telemetry; do not derive a contract threshold from its mean alone.
-- Add bounded clock offset/drift analysis before attempting any one-way latency estimate.
 - Record MCU queue, memory, and utilization headroom before proposing contract thresholds.

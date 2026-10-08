@@ -7,7 +7,6 @@ iterations="${QF_ITERATIONS:-1000}"
 warmup="${QF_WARMUP:-100}"
 timeout="${QF_TIMEOUT:-5}"
 preflight_timeout="${QF_PREFLIGHT_TIMEOUT:-0.25}"
-failure_iterations="${QF_FAILURE_ITERATIONS:-20}"
 sample_failures=0
 preflight_output="$(mktemp)"
 trap 'rm -f "$preflight_output"' EXIT
@@ -31,22 +30,10 @@ while IFS= read -r payload_size; do
   case "$preflight_exit_code" in
     0) ;;
     2)
-      echo "payload $payload_size failed preflight; recording a bounded failure sample" >&2
-      set +e
-      qf-stage1 run roundtrip \
-        --payload-size "$payload_size" \
-        --iterations "$failure_iterations" \
-        --warmup 0 \
-        --timeout "$preflight_timeout" \
-        --output "$output_path"
-      failure_exit_code=$?
-      set -e
-
-      case "$failure_exit_code" in
-        0 | 2) sample_failures=1 ;;
-        *) exit "$failure_exit_code" ;;
-      esac
-      continue
+      echo "payload $payload_size failed preflight; recording it and stopping the sweep" >&2
+      cat "$preflight_output" >>"$output_path"
+      sample_failures=1
+      break
       ;;
     *) exit "$preflight_exit_code" ;;
   esac

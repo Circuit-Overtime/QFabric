@@ -192,13 +192,18 @@ an infrastructure error. Never concatenate measurements from different firmware 
 configurations without matching environment metadata.
 
 Before each payload configuration, the sweep performs one call with a bounded timeout. A failed
-preflight records 20 attempts instead of waiting for 1,000 default five-second timeouts. The
-limits are configurable when investigating the boundary:
+preflight is recorded and stops the sweep instead of queuing more requests on an unhealthy Bridge
+path. The timeout is configurable when investigating the boundary:
 
 ```bash
-QF_PREFLIGHT_TIMEOUT=0.25 QF_FAILURE_ITERATIONS=20 QF_TIMEOUT=5 \
+QF_PREFLIGHT_TIMEOUT=0.25 QF_TIMEOUT=5 \
   bash scripts/run-stage1-campaign.sh idle initial-idle
 ```
+
+The baseline campaign uses the confirmed responsive range in
+`config/stage1-payload-sizes.txt`. Potentially disruptive sizes begin at 256 bytes and live in
+`config/stage1-boundary-payload-sizes.txt`; probe them separately, then verify or restart the
+Router before any subsequent baseline measurement.
 
 ## Controlled Linux contention
 

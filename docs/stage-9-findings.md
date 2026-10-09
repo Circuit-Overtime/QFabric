@@ -78,7 +78,7 @@ evidence that visualization improves performance.
 
 ## Independent audit
 
-The final audit was captured at `2026-10-09T08:10:00.730420+00:00`. All nine checks passed:
+The final audit was captured at `2026-10-09T08:11:44.179168+00:00`. All nine checks passed:
 
 - hardware campaign status;
 - complete mode coverage;

@@ -1,106 +1,137 @@
 # QFabric
 
-QFabric investigates safe, closed-loop recovery of empirical timing contracts across Linux and RTOS execution domains on the Arduino UNO Q.
+**One program, two computing worlds, and a safer way to recover when timing
+changes.**
 
-> **Research prototype:** QFabric 0.x is an empirical soft real-time research
-> artifact. It does not provide hard real-time guarantees or a formal
-> schedulability proof.
+[![PyPI](https://img.shields.io/pypi/v/qfabric?label=PyPI&color=3775A9)](https://pypi.org/project/qfabric/)
+[![CI](https://github.com/elixpo/qfabric/actions/workflows/ci.yml/badge.svg)](https://github.com/elixpo/qfabric/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/software-Apache--2.0-blue.svg)](LICENSE)
+[![Research](https://img.shields.io/badge/status-research-purple.svg)](paper/)
 
-## Installation
+<p align="center">
+  <img src="paper/figures/testbed.jpg"
+       alt="QFabric running on an Arduino UNO Q connected to the test computer"
+       width="760">
+</p>
 
-The Python analysis and control CLI requires Python 3.11 or newer:
+QFabric is a research system for computers that contain both a powerful Linux
+processor and a small real-time processor. Instead of permanently deciding
+which processor must run a function, a developer describes the timing behavior
+the application needs. QFabric measures both sides, detects sustained timing
+problems, and can move eligible work at a safe boundary. It then verifies the
+new placement and either commits it or rolls back.
+
+The first implementation runs on the **Arduino UNO Q**, combining Debian Linux
+with an STM32 microcontroller running Zephyr RTOS.
+
+## Why it exists
+
+Linux is capable and flexible, but its timing can vary under load. A real-time
+microcontroller is more predictable, but it has limited memory and compute
+capacity. Traditional embedded applications choose between them during
+development and keep that choice fixed.
+
+QFabric asks a narrower research question:
+
+> Can a lightweight runtime recover a violated empirical timing contract by
+> safely changing where a portable function executes across a Linux–RTOS
+> boundary?
+
+Its answer is a measured recovery loop:
+
+```text
+observe → detect → check safety → switch → verify → commit or roll back
+```
+
+QFabric does not claim hard real-time certification or that adaptation always
+beats expert tuning. It provides an evidence-driven fallback when an original
+placement stops meeting its measured soft real-time contract.
+
+## What the prototype demonstrates
+
+- The same bounded task can execute on Linux or the real-time MCU.
+- Decisions include communication cost, task semantics, and available MCU
+  capacity—not execution speed alone.
+- Switching waits for a zero-inflight epoch boundary.
+- A probation window determines whether to commit or roll back.
+- Every recommendation and recovery action has a replayable decision record.
+- The onboard LED matrix exposes live runtime state without becoming part of
+  the decision policy.
+
+In the controlled four-node load-shift experiment, ordinary Linux reached a
+111.30 ms p95 latency and missed 67.3% of 80 ms deadlines. QFabric recovery
+reduced p95 to 70.61 ms and misses to 3.7%. A carefully tuned Linux
+`SCHED_FIFO` baseline remained faster at 23.91 ms with no misses—an important
+boundary on the research claim.
+
+## Try the command-line tools
+
+QFabric supports Python 3.11 and newer:
 
 ```bash
 python3 -m pip install qfabric
 qf --help
 ```
 
-Hardware execution commands additionally require an Arduino UNO Q with the
-matching firmware from this repository. Reproducing the paper therefore uses a
-full repository checkout rather than the Python wheel alone.
+The package provides analysis, profiling, contract, recommendation, recovery,
+decision-history, visualization, instrumentation, and evaluation commands.
+Hardware execution additionally requires an Arduino UNO Q flashed with the
+matching firmware from this repository.
 
-Development is organized by the tracking issues in the [GitHub issue tracker](https://github.com/elixpo/qfabric/issues). The complete research plan is archived in [issue #13](https://github.com/elixpo/qfabric/issues/13).
+## Explore the research
 
-## Current stage
+| Start here | What it contains |
+| --- | --- |
+| [Research paper](paper/) | IEEE-style manuscript, bibliography, figures, and build instructions |
+| [Stage 11 evaluation](docs/stage-11-evaluation.md) | Final experimental protocol and baselines |
+| [Stage 11 findings](docs/stage-11-findings.md) | Results, limitations, and research-question answers |
+| [Recovery design](docs/stage-7-recovery.md) | Safe switching, probation, commit, and rollback |
+| [Decision evidence](docs/stage-8-decisions.md) | Hash-chained records, explanations, and replay |
+| [LED visualization](docs/stage-9-visualization.md) | Physical telemetry grammar and overhead evaluation |
+| [Original research plan](https://github.com/elixpo/qfabric/issues/13) | The complete problem framing and staged build plan |
 
-Stage 1 is complete. Its 136,800-sample evidence base, findings, recommendations, and documented
-platform limitations are recorded in [the Stage 1 findings](docs/stage-1-findings.md).
+The repository includes raw and processed experimental evidence, independent
+stage audits, reproducible paper tables and figures, package artifacts, and
+checksum manifests.
 
-Stage 2 is complete. One logical QTask executes through the same CLI on either a real Linux ARM64
-artifact or the STM32/Zephyr RT domain, with explicit domain selection and no placement policy.
-The implementation and acceptance evidence are recorded in the
-[Stage 2 findings](docs/stage-2-findings.md).
-
-Stage 3 is complete. It defines the versioned cross-domain ABI, generated serialization, replay
-protection, defensive decoding, and effect classes. The implementation and hardware audit are
-recorded in the [Stage 3 findings](docs/stage-3-findings.md).
-
-Stage 4 is complete. It provides correlated end-to-end QTask profiling, strict cross-clock
-measurement semantics, bounded sample windows, independently verified aggregates, and measured
-instrumentation overhead. The implementation and hardware audit are recorded in the
-[Stage 4 findings](docs/stage-4-findings.md).
-
-Stage 5 is complete. It turns measured timing evidence into deterministic empirical soft
-real-time contract states and transitions. The semantics and hardware evidence are recorded in
-the [Stage 5 specification](docs/stage-5-contracts.md) and
-[Stage 5 findings](docs/stage-5-findings.md).
-
-Stage 6 is complete. It provides gated, explainable, deterministic recommendations over measured
-end-to-end evidence without changing live placement. The policy and audit evidence are recorded in
-the [Stage 6 specification](docs/stage-6-recommendations.md) and
-[Stage 6 findings](docs/stage-6-findings.md).
-
-Stage 7 is complete. It provides safe closed-loop recovery from credible empirical timing-contract
-violations, including gated actuation, zero-inflight boundaries, epoch-controlled transitions,
-probation, commit, rollback, cooldown, and candidate blacklisting. The protocol, hardware evidence,
-claim boundary, and independent audit are recorded in the
-[Stage 7 specification](docs/stage-7-recovery.md) and
-[Stage 7 findings](docs/stage-7-findings.md).
-
-Stage 8 is complete. It provides hash-chained immutable decision history, restart-safe persistence,
-faithful human and JSON explanations, stable identifiers, and exact versioned replay for Stage 6
-recommendations and Stage 7 recovery actions. The schema, evidence, audit, and trust limitations
-are recorded in the [Stage 8 specification](docs/stage-8-decisions.md) and
-[Stage 8 findings](docs/stage-8-findings.md).
-
-Stage 9 is complete. It provides a bounded, disableable LED matrix and RGB physical debugger driven
-only by real QFabric telemetry and stable decision identifiers. Its state grammar, update path,
-hardware coverage, controlled overhead experiment, and limitations are recorded in the
-[Stage 9 specification](docs/stage-9-visualization.md) and
-[Stage 9 findings](docs/stage-9-findings.md).
-
-Stage 10 is complete. It adds only the standard Linux perf instrumentation justified by a measured
-userspace attribution gap, preserves the userspace-only fallback, and deliberately introduces no
-eBPF program or kernel module. The architecture, privileges, limitations, controlled accuracy and
-overhead results are recorded in the
-[Stage 10 specification](docs/stage-10-kernel-instrumentation.md) and
-[Stage 10 findings](docs/stage-10-findings.md).
-
-Stage 11 is complete. It evaluates four workload graphs and a loaded flagship scenario against
-seven baselines, including SCHED_FIFO, manual, recovery, and oracle placements. The full evidence
-matrix, honest negative result against tuned Linux, six research-question answers, paper artifacts,
-limitations, and independent audit are recorded in the
-[Stage 11 protocol](docs/stage-11-evaluation.md) and
-[Stage 11 findings](docs/stage-11-findings.md).
-
-## Research paper
-
-The submission-oriented IEEE manuscript, bibliography, reproducible figure and table generator,
-and testbed-photo instructions are in [paper/](paper/). Build the PDF with `make -C paper`.
-Quantitative manuscript assets are regenerated from the audited Stage 11 evaluation report. The
-repository also provides a GitHub-compatible [citation file](CITATION.cff).
-
-## Local checks
-
-The hardware-independent tests use only Python's standard library:
+## Build and verify
 
 ```bash
 python3 -m unittest discover -s tests -v
 python3 -m compileall -q src tests
+make -C paper
 ```
 
-## License and citation
+Hardware-independent checks use the Python standard library. Hardware campaigns
+and firmware builds require the UNO Q toolchain described in
+[the Stage 1 guide](docs/stage-1.md).
 
-QFabric is licensed under the [Apache License 2.0](LICENSE). Cite the software
-using [CITATION.cff](CITATION.cff); release archives also include the paper and
-audited evidence needed to reproduce the reported claims.
+## Authors and citation
+
+QFabric is authored by:
+
+- **Ayushman Bhattacharya** — [ayushman@myceli.ai](mailto:ayushman@myceli.ai)
+- **Anwesha Chakraborty** — [anwesha.elixpo@gmail.com](mailto:anwesha.elixpo@gmail.com)
+
+Use [CITATION.cff](CITATION.cff) when citing the software or research artifact.
+Versioned releases contain the paper, audited evaluation, package distributions,
+manifest, and SHA-256 checksums.
+
+## Licensing and manuscript rights
+
+The QFabric software and non-manuscript project material are licensed under the
+[Apache License 2.0](LICENSE).
+
+The unpublished manuscript, its original figures and tables, and the testbed
+photograph are **not** licensed under Apache-2.0. They are © 2026 Ayushman
+Bhattacharya and Anwesha Chakraborty, All Rights Reserved, under the separate
+[manuscript rights notice](paper/LICENSE.md). Citation and personal review are
+permitted; republication, adaptation, or redistribution requires written
+permission until the authors publish replacement terms.
+
+## Project home
+
+- Repository: <https://github.com/elixpo/qfabric>
+- Issues: <https://github.com/elixpo/qfabric/issues>
+- Python package: <https://pypi.org/project/qfabric/>
+

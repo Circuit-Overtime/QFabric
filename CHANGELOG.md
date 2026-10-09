@@ -14,6 +14,10 @@ Semantic Versioning.
   GitHub organization.
 - Prepared a patch release so package indexes expose the canonical repository
   rather than retaining the immutable links embedded in earlier distributions.
+- Reworked the project README around a plain-language overview, real testbed
+  photograph, honest result summary, short installation path, and research map.
+- Separated the unpublished manuscript and its original visual material from
+  the Apache-2.0 software grant under an explicit prepublication rights notice.
 
 ## [1.0.1] - 2026-10-09
 

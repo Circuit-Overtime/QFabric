@@ -101,6 +101,30 @@ bash scripts/run-stage2-smoke.sh
 The script verifies identical correct results and identical argument-count error reporting for
 both domain selections.
 
+The Stage 2 firmware replaces the Stage 1 probe firmware. Consequently, `qf-stage1 check` is not
+a valid health check after this upload: the intentionally removed `qf_stage1_echo` method will be
+reported as unavailable.
+
+## Completion audit
+
+Copy the successful workstation build report to the UNO Q:
+
+```bash
+scp build/stage2/build-report.json \
+  qfabric-unoq:~/QFabric/build/stage2/build-report.json
+```
+
+Then update the checkout and run the audit on the UNO Q:
+
+```bash
+git pull --ff-only
+python -m pip install -e .
+qf audit --output data/processed/stage2-audit.json
+```
+
+The audit checks the dual-target build record, QTask source, ARM64 ELF architecture, live result
+parity, and identical invalid-invocation behavior. A completed Stage 2 audit reports `pass`.
+
 ## Evidence
 
 Retain the following for issue #3:
@@ -108,4 +132,5 @@ Retain the following for issue #3:
 - `build/stage2/build-report.json` and the complete `qf build` transcript;
 - the two explicit `qf run` commands and results;
 - the non-interactive smoke-test result; and
+- `data/processed/stage2-audit.json`;
 - this architecture note.

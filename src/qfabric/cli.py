@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from .audit import audit_stage2, write_audit
 from .build import build_stage2
 from .runtime import parse_add_arguments, run_linux, run_rt
 
@@ -14,6 +15,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     build = subparsers.add_parser("build", help="build Linux ARM64 and RT MCU artifacts")
     build.add_argument("--root", type=Path, default=Path.cwd())
+
+    audit = subparsers.add_parser("audit", help="validate the complete Stage 2 evidence")
+    audit.add_argument("--root", type=Path, default=Path.cwd())
+    audit.add_argument("--output", type=Path, required=True)
+    audit.add_argument("--timeout", type=float, default=2.0)
+    audit.add_argument("--address", default="unix:///var/run/arduino-router.sock")
 
     run = subparsers.add_parser("run", help="run one QTask on an explicit execution domain")
     run.add_argument("task")
@@ -50,6 +57,17 @@ def main(argv: list[str] | None = None) -> int:
             report = build_stage2(args.root.resolve())
             _print_build(report)
             return 0 if report["status"] == "pass" else 1
+
+        if args.command == "audit":
+            if task_arguments:
+                raise ValueError("qf audit does not accept task arguments")
+            result = audit_stage2(args.root.resolve(), args.address, timeout=args.timeout)
+            write_audit(result, args.output)
+            print(f"Stage 2 audit: {result['status']}")
+            print(f"audit report: {args.output}")
+            for failure in result["failures"]:
+                print(f"- {failure}", file=sys.stderr)
+            return 0 if result["status"] == "pass" else 1
 
         if args.task != "add":
             raise ValueError(f"unknown QTask: {args.task}")

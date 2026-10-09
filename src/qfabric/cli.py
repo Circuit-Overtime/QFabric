@@ -38,6 +38,15 @@ from .decision_records import (
     record_recommendation,
     replay_decision,
 )
+from .evaluation import (
+    evaluate_stage11,
+    probe_scheduler_environment,
+    write_evaluation,
+    write_figure,
+    write_scheduler_environment,
+    write_tables,
+)
+from .evaluation_audit import audit_stage11, write_stage11_audit
 from .explanations import explain_decision, render_explanation, render_replay
 from .kernel_audit import audit_stage10, write_stage10_audit
 from .kernel_instrumentation import (
@@ -354,6 +363,52 @@ def build_parser() -> argparse.ArgumentParser:
     kernel_audit.add_argument("--fallback", type=Path, required=True)
     kernel_audit.add_argument("--maximum-p95-overhead-pct", type=float, default=15.0)
     kernel_audit.add_argument("--output", type=Path, required=True)
+
+    evaluate = subparsers.add_parser(
+        "evaluate", help="run and audit the final Stage 11 evaluation"
+    )
+    evaluate_subparsers = evaluate.add_subparsers(
+        dest="evaluate_command", required=True
+    )
+    evaluate_scheduler = evaluate_subparsers.add_parser(
+        "scheduler", help="capture the active tuned-Linux scheduler environment"
+    )
+    evaluate_scheduler.add_argument("--output", type=Path, required=True)
+    evaluate_run = evaluate_subparsers.add_parser(
+        "run", help="evaluate applications and baselines from measured traces"
+    )
+    evaluate_run.add_argument("--root", type=Path, default=Path.cwd())
+    evaluate_run.add_argument(
+        "--applications",
+        type=Path,
+        default=Path("config/stage11-applications.json"),
+    )
+    evaluate_run.add_argument("--stage1", type=Path, action="append", required=True)
+    evaluate_run.add_argument("--stage4-profile", type=Path, required=True)
+    evaluate_run.add_argument(
+        "--loaded-linux", type=Path, action="append", required=True
+    )
+    evaluate_run.add_argument("--tuned-profile", type=Path)
+    evaluate_run.add_argument("--tuned-loaded-profile", type=Path)
+    evaluate_run.add_argument("--scheduler", type=Path)
+    evaluate_run.add_argument("--recovery-success", type=Path, required=True)
+    evaluate_run.add_argument("--recovery-rollback", type=Path, required=True)
+    evaluate_run.add_argument(
+        "--recommendation-scenarios", type=Path, required=True
+    )
+    evaluate_run.add_argument("--stage9-audit", type=Path, required=True)
+    evaluate_run.add_argument("--stage10-audit", type=Path, required=True)
+    evaluate_run.add_argument("--observations", type=int, default=1000)
+    evaluate_run.add_argument("--output", type=Path, required=True)
+    evaluate_run.add_argument("--table", type=Path, required=True)
+    evaluate_run.add_argument("--figure", type=Path, required=True)
+    evaluate_audit = evaluate_subparsers.add_parser(
+        "audit", help="audit the complete Stage 11 evidence matrix"
+    )
+    evaluate_audit.add_argument("--input", type=Path, required=True)
+    evaluate_audit.add_argument("--table", type=Path, required=True)
+    evaluate_audit.add_argument("--figure", type=Path, required=True)
+    evaluate_audit.add_argument("--output", type=Path, required=True)
 
     contract = subparsers.add_parser(
         "contract", help="evaluate an empirical soft real-time contract"
@@ -843,6 +898,54 @@ def main(argv: list[str] | None = None) -> int:
             )
             write_stage10_audit(report, args.output)
             print(f"Stage 10 audit: {report['status']}")
+            print(f"audit report: {args.output}")
+            for failure in report["failures"]:
+                print(f"- {failure}", file=sys.stderr)
+            return 0 if report["status"] == "pass" else 1
+
+        if args.command == "evaluate":
+            if task_arguments:
+                raise ValueError("qf evaluate does not accept task arguments")
+            if args.evaluate_command == "scheduler":
+                report = probe_scheduler_environment()
+                write_scheduler_environment(report, args.output)
+                state = (
+                    "available"
+                    if report["sched_fifo"]["available"]
+                    else "unavailable"
+                )
+                print(f"Stage 11 SCHED_FIFO baseline: {state}")
+                print(f"scheduler report: {args.output}")
+                return 0
+            if args.evaluate_command == "run":
+                report = evaluate_stage11(
+                    args.root.resolve(),
+                    applications_path=args.applications,
+                    stage1_paths=args.stage1,
+                    stage4_profile_path=args.stage4_profile,
+                    loaded_linux_paths=args.loaded_linux,
+                    tuned_profile_path=args.tuned_profile,
+                    tuned_loaded_profile_path=args.tuned_loaded_profile,
+                    scheduler_path=args.scheduler,
+                    recovery_success_path=args.recovery_success,
+                    recovery_rollback_path=args.recovery_rollback,
+                    recommendation_scenarios_path=args.recommendation_scenarios,
+                    stage9_audit_path=args.stage9_audit,
+                    stage10_audit_path=args.stage10_audit,
+                    observations=args.observations,
+                )
+                write_evaluation(report, args.output)
+                write_tables(report, args.table)
+                write_figure(report, args.figure)
+                print(
+                    f"Stage 11 evaluation: {len(report['results'])} application cells, "
+                    f"{len(report['flagship']['results'])} flagship cells"
+                )
+                print(f"evaluation report: {args.output}")
+                return 0
+            report = audit_stage11(args.input, args.table, args.figure)
+            write_stage11_audit(report, args.output)
+            print(f"Stage 11 audit: {report['status']}")
             print(f"audit report: {args.output}")
             for failure in report["failures"]:
                 print(f"- {failure}", file=sys.stderr)

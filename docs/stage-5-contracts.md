@@ -145,5 +145,27 @@ first entry into each state in both window and absolute-observation units, and t
 sustained-violation detection bound. Candidate windows smaller than the declared minimum evidence
 are rejected rather than silently changing the contract.
 
+## Controlled transition validation
+
+Generate a labelled injected trace and audit every state transition:
+
+```bash
+qf contract scenario \
+  --input data/raw/stage5/rt-full-trace.json \
+  --trace-output data/raw/stage5/rt-full-injected-trace.json \
+  --report-output data/processed/stage5/rt-full-transition-report.json
+```
+
+The scenario reuses successful, within-deadline latency values from the source trace for healthy
+observations. It then applies explicit phases for one isolated spike, post-spike recovery,
+sustained deadline misses, recovery, sustained timeouts, and final recovery. Deadline misses are
+injected at exactly one nanosecond beyond the configured boundary; the total-failure phase uses
+explicit timeout observations.
+
+The generated trace is permanently labelled `injected: true` and
+`state-machine-validation-not-hardware-performance`. Its purpose is to prove deterministic state
+and detection semantics, not to estimate the physical system's miss rate. The scenario command
+fails unless every phase ends in its expected state and all five states receive coverage.
+
 P99 and jitter contracts are intentionally deferred until this deadline/miss-rate contract has
 hardware trace and sensitivity evidence.

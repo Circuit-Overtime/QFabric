@@ -1,6 +1,11 @@
 import unittest
 
-from qfabric.contract_analysis import analyze_contract_sensitivity, profile_group_to_trace
+from qfabric.contract_analysis import (
+    analyze_contract_sensitivity,
+    audit_transition_scenario,
+    build_transition_scenario,
+    profile_group_to_trace,
+)
 from qfabric.contracts import ContractObservation, DeadlineContract
 
 
@@ -22,6 +27,35 @@ def policy(**changes) -> DeadlineContract:
 
 
 class QFabricContractAnalysisTests(unittest.TestCase):
+    def test_controlled_scenario_covers_every_state_and_phase(self) -> None:
+        source = [ContractObservation("ok", latency) for latency in (40, 50, 60, 70)]
+        trace = build_transition_scenario(policy(), source)
+        report = audit_transition_scenario(trace)
+        self.assertEqual(report["status"], "pass")
+        self.assertEqual(report["failures"], [])
+        self.assertTrue(trace["provenance"]["injected"])
+        self.assertEqual(
+            trace["provenance"]["research_use"],
+            "state-machine-validation-not-hardware-performance",
+        )
+        coverage = next(check for check in report["checks"] if check["phase"] == "state-coverage")
+        self.assertEqual(
+            coverage["observed"],
+            ["AT_RISK", "INFEASIBLE", "SATISFIED", "UNKNOWN", "VIOLATED"],
+        )
+        isolated = next(check for check in report["checks"] if check["phase"] == "isolated-spike")
+        self.assertTrue(isolated["passed"])
+
+    def test_controlled_scenario_rejects_policy_that_violates_on_one_window(self) -> None:
+        with self.assertRaisesRegex(ValueError, "at least 2"):
+            build_transition_scenario(
+                policy(violation_windows=1), [ContractObservation("ok", 50)]
+            )
+
+    def test_controlled_scenario_requires_real_deadline_hit(self) -> None:
+        with self.assertRaisesRegex(ValueError, "source deadline hit"):
+            build_transition_scenario(policy(), [ContractObservation("timeout")])
+
     def test_profile_group_conversion_preserves_outcomes_and_provenance(self) -> None:
         profile = {
             "schema_version": 1,

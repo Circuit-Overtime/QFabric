@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import math
 from collections import Counter
 from dataclasses import replace
 from pathlib import Path
@@ -16,6 +17,7 @@ from .contracts import (
 )
 
 SENSITIVITY_SCHEMA_VERSION = 1
+SCENARIO_SCHEMA_VERSION = 1
 
 
 def profile_group_to_trace(
@@ -71,6 +73,193 @@ def _sample_to_observation(sample: dict[str, Any]) -> ContractObservation:
 def write_contract_trace(trace: dict[str, object], output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(trace, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def build_transition_scenario(
+    contract: DeadlineContract, source_observations: list[ContractObservation]
+) -> dict[str, object]:
+    if contract.violation_windows < 2:
+        raise ValueError("transition scenario requires violation_windows of at least 2")
+    if contract.window_size < 2:
+        raise ValueError("transition scenario requires window_size of at least 2")
+    source_hits = [
+        observation.latency_ns
+        for observation in source_observations
+        if observation.outcome == "ok"
+        and observation.latency_ns is not None
+        and observation.latency_ns <= contract.deadline_ns
+    ]
+    if not source_hits:
+        raise ValueError("transition scenario requires at least one source deadline hit")
+
+    observations: list[dict[str, object]] = []
+    source_cursor = 0
+
+    def append_hit(phase: str) -> None:
+        nonlocal source_cursor
+        source_index = source_cursor % len(source_hits)
+        observations.append(
+            {
+                "outcome": "ok",
+                "latency_ns": source_hits[source_index],
+                "phase": phase,
+                "injection": "none",
+                "source_hit_index": source_index,
+            }
+        )
+        source_cursor += 1
+
+    def append_window(phase: str, misses: int, *, missing: bool = False) -> None:
+        for index in range(contract.window_size):
+            if index < misses:
+                observations.append(
+                    {
+                        "outcome": "timeout" if missing else "ok",
+                        "latency_ns": None if missing else contract.deadline_ns + 1,
+                        "phase": phase,
+                        "injection": "timeout" if missing else "deadline-plus-one-ns",
+                        "source_hit_index": None,
+                    }
+                )
+            else:
+                append_hit(phase)
+
+    for _ in range(contract.warmup_samples):
+        append_hit("contract-warmup")
+
+    phases: list[dict[str, object]] = []
+    next_window = 1
+
+    def add_phase(
+        name: str,
+        window_count: int,
+        misses: int,
+        expected_end_state: str,
+        *,
+        missing: bool = False,
+    ) -> None:
+        nonlocal next_window
+        start_window = next_window
+        for _ in range(window_count):
+            append_window(name, misses, missing=missing)
+            next_window += 1
+        phases.append(
+            {
+                "name": name,
+                "start_window": start_window,
+                "end_window": next_window - 1,
+                "expected_end_state": expected_end_state,
+            }
+        )
+
+    add_phase("baseline-healthy", 1, 0, ContractState.SATISFIED.value)
+    add_phase("isolated-spike", 1, 1, "NOT_VIOLATED")
+    add_phase(
+        "post-spike-recovery",
+        contract.recovery_windows,
+        0,
+        ContractState.SATISFIED.value,
+    )
+    violating_misses = math.floor(
+        contract.max_miss_rate_pct * contract.window_size / 100
+    ) + 1
+    add_phase(
+        "sustained-violation",
+        contract.violation_windows,
+        violating_misses,
+        ContractState.VIOLATED.value,
+    )
+    add_phase(
+        "violation-recovery",
+        contract.recovery_windows,
+        0,
+        ContractState.SATISFIED.value,
+    )
+    add_phase(
+        "total-failure",
+        contract.infeasible_windows,
+        contract.window_size,
+        ContractState.INFEASIBLE.value,
+        missing=True,
+    )
+    add_phase(
+        "infeasible-recovery",
+        contract.recovery_windows,
+        0,
+        ContractState.SATISFIED.value,
+    )
+    return {
+        "schema_version": CONTRACT_SCHEMA_VERSION,
+        "contract": contract.to_dict(),
+        "provenance": {
+            "source": "controlled-transition-injection",
+            "source_observations": len(source_observations),
+            "source_deadline_hits": len(source_hits),
+            "injected": True,
+            "research_use": "state-machine-validation-not-hardware-performance",
+        },
+        "scenario": {
+            "schema_version": SCENARIO_SCHEMA_VERSION,
+            "violating_misses_per_window": violating_misses,
+            "phases": phases,
+        },
+        "observations": observations,
+    }
+
+
+def audit_transition_scenario(trace: dict[str, object]) -> dict[str, object]:
+    contract = DeadlineContract.from_dict(trace["contract"])
+    observations = [
+        ContractObservation.from_dict(observation) for observation in trace["observations"]
+    ]
+    replay = replay_contract(contract, observations)
+    checks = []
+    for phase in trace["scenario"]["phases"]:
+        observed = replay["windows"][phase["end_window"] - 1]["state_after"]
+        expected = phase["expected_end_state"]
+        passed = (
+            observed not in {ContractState.VIOLATED.value, ContractState.INFEASIBLE.value}
+            if expected == "NOT_VIOLATED"
+            else observed == expected
+        )
+        checks.append(
+            {
+                "phase": phase["name"],
+                "end_window": phase["end_window"],
+                "expected": expected,
+                "observed": observed,
+                "passed": passed,
+            }
+        )
+    state_coverage = sorted(
+        {replay["windows"][0]["state_before"]}
+        | {window["state_after"] for window in replay["windows"]}
+    )
+    required_states = sorted(state.value for state in ContractState)
+    coverage_passed = state_coverage == required_states
+    checks.append(
+        {
+            "phase": "state-coverage",
+            "expected": required_states,
+            "observed": state_coverage,
+            "passed": coverage_passed,
+        }
+    )
+    failures = [check["phase"] for check in checks if not check["passed"]]
+    return {
+        "schema_version": SCENARIO_SCHEMA_VERSION,
+        "claim": "controlled-state-machine-validation",
+        "status": "pass" if not failures else "fail",
+        "failures": failures,
+        "checks": checks,
+        "contract": contract.to_dict(),
+        "replay": replay,
+    }
+
+
+def write_scenario_report(report: dict[str, object], output: Path) -> None:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def analyze_contract_sensitivity(

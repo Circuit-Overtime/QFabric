@@ -15,8 +15,11 @@ from .audit import audit_stage2, write_audit
 from .build import build_stage2
 from .contract_analysis import (
     analyze_contract_sensitivity,
+    audit_transition_scenario,
+    build_transition_scenario,
     profile_group_to_trace,
     write_contract_trace,
+    write_scenario_report,
     write_sensitivity_report,
 )
 from .contracts import (
@@ -130,6 +133,12 @@ def build_parser() -> argparse.ArgumentParser:
     contract_sensitivity.add_argument("--violation-windows", default="1,2,3")
     contract_sensitivity.add_argument("--recovery-windows", default="1,2,3")
     contract_sensitivity.add_argument("--output", type=Path, required=True)
+    contract_scenario = contract_subparsers.add_parser(
+        "scenario", help="inject and audit every contract-state transition"
+    )
+    contract_scenario.add_argument("--input", type=Path, required=True)
+    contract_scenario.add_argument("--trace-output", type=Path, required=True)
+    contract_scenario.add_argument("--report-output", type=Path, required=True)
 
     status = subparsers.add_parser("status", help="show the latest persisted QTask profile")
     status.add_argument("--input", type=Path, default=Path(".qfabric/profile.json"))
@@ -291,6 +300,17 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 return 0
             contract, observations = load_contract_trace(args.input)
+            if args.contract_command == "scenario":
+                trace = build_transition_scenario(contract, observations)
+                write_contract_trace(trace, args.trace_output)
+                report = audit_transition_scenario(trace)
+                write_scenario_report(report, args.report_output)
+                print(f"Stage 5 transition scenario: {report['status']}")
+                print(f"injected trace: {args.trace_output}")
+                print(f"scenario report: {args.report_output}")
+                for failure in report["failures"]:
+                    print(f"- {failure}", file=sys.stderr)
+                return 0 if report["status"] == "pass" else 1
             if args.contract_command == "sensitivity":
                 report = analyze_contract_sensitivity(
                     contract,

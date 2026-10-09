@@ -28,16 +28,15 @@
 \newcommand{\rtdom}{RT}
 \hypersetup{
   pdftitle={QFabric: Contract-Driven Recovery Across a Linux--RTOS Boundary},
-  pdfauthor={Anonymous authors},
+  pdfauthor={Ayushman Bhattacharya},
   pdfsubject={Empirical soft real-time recovery across Linux and RTOS domains},
   pdfkeywords={heterogeneous embedded systems, Linux, RTOS, timing contracts}
 }
 
 \title{QFabric: Contract-Driven Recovery Across a Linux--RTOS Boundary}
 
-\author{\IEEEauthorblockN{Anonymous authors}
-\IEEEauthorblockA{Artifact available at
-\url{https://github.com/Circuit-Overtime/QFabric}}}
+\author{\IEEEauthorblockN{Ayushman Bhattacharya}
+\IEEEauthorblockA{\href{mailto:ayushman@myceli.ai}{ayushman@myceli.ai}}}
 
 \begin{document}
 \maketitle
@@ -132,28 +131,29 @@ architecture is representative of remote-processor systems built around
 \cite{linuxRemoteproc,linuxRpmsg}, but our implementation targets the stock UNO
 Q software stack rather than modifying the transport.
 
-\begin{figure}[t]
+\begin{figure*}[t]
 \centering
 \begin{tikzpicture}[
   font=\scriptsize,
-  node distance=4mm and 5mm,
-  box/.style={draw,rounded corners,minimum width=28mm,minimum height=7mm,align=center},
+  node distance=5mm and 8mm,
+  box/.style={draw,rounded corners,minimum width=31mm,minimum height=8mm,align=center},
   flow/.style={-{Latex[length=2mm]},thick}
 ]
 \node[box,fill=qblue!10] (app) {Application graph\\and QTask call sites};
 \node[box,fill=qblue!10,below=of app] (ctl) {Contract monitor\\recovery controller};
-\node[box,fill=qgreen!12,below left=7mm and -2mm of ctl] (linux) {Linux executor\\AArch64 binary};
-\node[box,fill=qorange!14,below right=7mm and -2mm of ctl] (rt) {Zephyr executor\\Cortex-M33 sketch};
+\node[box,fill=qgreen!12,below left=9mm and 1mm of ctl] (linux) {Linux executor\\AArch64 binary};
+\node[box,fill=qorange!14,below right=9mm and 1mm of ctl] (rt) {Zephyr executor\\Cortex-M33 sketch};
 \draw[flow] (app) -- (ctl);
-\draw[flow] (ctl) -- node[left]{dispatch} (linux);
-\draw[flow] (ctl) -- node[right]{dispatch} (rt);
-\draw[flow,<->] (linux) -- node[below]{Bridge RPC / bounded ABI} (rt);
-\node[draw,dashed,fit=(linux)(rt),inner sep=3mm,label=below:{Arduino UNO Q}] {};
+\draw[flow] (ctl.south west) -- node[left,pos=0.58]{dispatch} (linux.north);
+\draw[flow] (ctl.south east) -- node[right,pos=0.58]{dispatch} (rt.north);
+\draw[flow,<->] (linux) -- node[above,fill=white,inner sep=1pt]{Bridge RPC} (rt);
+\node[draw,dashed,fit=(linux)(rt),inner xsep=4mm,inner ysep=7mm,
+      label={[font=\scriptsize]below:{Arduino UNO Q / bounded ABI}}] {};
 \end{tikzpicture}
 \caption{\system architecture. The policy runs in Linux userspace; task code
 has a native implementation in each domain.}
 \label{fig:architecture}
-\end{figure}
+\end{figure*}
 
 \subsection{System model}
 An application is a directed graph $G=(V,E)$. Each task $t\in V$ may have a
@@ -300,26 +300,27 @@ verified recovery.
 \centering
 \begin{tikzpicture}[
   font=\scriptsize,
-  node distance=5mm,
-  state/.style={draw,rounded corners,minimum width=24mm,minimum height=6mm,align=center},
+  node distance=5.5mm and 8mm,
+  state/.style={draw,rounded corners,minimum width=25mm,minimum height=7mm,align=center},
+  outcome/.style={draw,rounded corners,minimum width=20mm,minimum height=6.5mm,align=center},
   arr/.style={-{Latex[length=1.8mm]},thick}
 ]
 \node[state,fill=qgreen!12] (stable) {Stable};
 \node[state,fill=qorange!13,below=of stable] (viol) {Violation\\hysteresis};
-\node[state,fill=qblue!10,below=of viol] (drain) {Admit, drain,\\increment epoch};
-\node[state,fill=qorange!13,below left=5mm and -3mm of drain] (prob) {Probation};
-\node[state,fill=qgreen!12,below left=5mm and -5mm of prob] (commit) {Commit};
-\node[state,fill=qred!10,below right=5mm and -5mm of prob] (rollback) {Rollback};
-\draw[arr] (stable) -- node[right]{3 bad windows} (viol);
-\draw[arr] (viol) -- node[right]{candidate passes} (drain);
-\draw[arr] (drain) -- (prob);
-\draw[arr] (prob) -- node[left]{contract holds} (commit);
-\draw[arr] (prob) -- node[right]{violation} (rollback);
-\draw[arr] (viol.east) to[bend left=48] node[right]{reject} (stable.east);
-\draw[arr] (commit.west) to[bend right=45] (stable.west);
-\draw[arr] (rollback.east) to[bend left=55] (stable.east);
+\node[state,fill=qblue!10,below=of viol] (drain) {Admit candidate\\drain and increment epoch};
+\node[outcome,fill=gray!10,right=of drain] (noswitch) {No switch};
+\node[state,fill=qorange!13,below=of drain] (prob) {Probation};
+\node[outcome,fill=qgreen!12,below left=6mm and 3mm of prob] (commit) {Commit};
+\node[outcome,fill=qred!10,below right=6mm and 3mm of prob] (rollback) {Rollback};
+\draw[arr] (stable) -- node[right,pos=0.5]{3 bad windows} (viol);
+\draw[arr] (viol) -- node[right,pos=0.5]{candidate passes} (drain);
+\draw[arr] (viol.east) -| node[above,pos=0.72]{reject} (noswitch.north);
+\draw[arr] (drain) -- node[right,pos=0.5]{safe boundary} (prob);
+\draw[arr] (prob) -- node[left,pos=0.6]{contract holds} (commit);
+\draw[arr] (prob) -- node[right,pos=0.6]{violation} (rollback);
 \end{tikzpicture}
-\caption{Contract recovery. Prediction authorizes probation, not commitment.}
+\caption{Contract recovery. Prediction authorizes probation, not commitment;
+each terminal outcome returns the monitor to Stable.}
 \label{fig:state}
 \end{figure}
 
@@ -384,8 +385,14 @@ Claim class & Empirical soft real-time \\
   Testbed photograph pending\\[2mm]
   Add \texttt{paper/figures/testbed.jpg}; see capture instructions.}}%
 }
-\caption{Physical testbed. The source package intentionally uses a placeholder
-until a photograph of the actual experimental board is supplied.}
+\IfFileExists{figures/testbed.jpg}{%
+\caption{Physical testbed displaying audited decision 2: an accepted
+Linux-to-RT transition. Matrix rows encode the Linux source, RPC boundary, and
+RT destination; the single illuminated column is the prototype's one QTask.}%
+}{%
+\caption{Testbed photograph placeholder. The intended capture is audited
+decision 2, an accepted Linux-to-RT transition; no synthetic image is used.}%
+}
 \label{fig:testbed-photo}
 \end{figure}
 

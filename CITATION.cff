@@ -3,7 +3,9 @@ message: "If you use QFabric or its evaluation artifact, please cite this softwa
 title: "QFabric: Contract-Driven Cross-Domain Task Recovery"
 type: software
 authors:
-  - name: "Circuit Overtime"
+  - family-names: "Bhattacharya"
+    given-names: "Ayushman"
+    email: "ayushman@myceli.ai"
 version: 0.1.0
 date-released: 2026-10-09
 repository-code: "https://github.com/Circuit-Overtime/QFabric"
@@ -14,7 +16,9 @@ abstract: >-
 preferred-citation:
   type: software
   authors:
-    - name: "Circuit Overtime"
+    - family-names: "Bhattacharya"
+      given-names: "Ayushman"
+      email: "ayushman@myceli.ai"
   title: "QFabric: Contract-Driven Cross-Domain Task Recovery"
   year: 2026
   version: "commit 719ffe0"

@@ -7,9 +7,40 @@ from pathlib import Path
 from unittest.mock import patch
 
 from qfabric.cli import main
+from qfabric.profiling import Instrumentation, ProfileCollector, ProfileSample, write_profile
 
 
 class QFabricCliTests(unittest.TestCase):
+    def test_status_human_and_json_output(self) -> None:
+        collector = ProfileCollector(capacity=2, warmup=0, minimum_samples=1)
+        collector.add(
+            ProfileSample(
+                task="add",
+                task_id=1,
+                invocation_id=1,
+                epoch=1,
+                domain="linux",
+                instrumentation=Instrumentation.REDUCED,
+                outcome="ok",
+                linux_started_ns=10,
+                linux_finished_ns=20,
+            )
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            profile = Path(directory) / "profile.json"
+            write_profile(collector.report(), profile)
+            human = io.StringIO()
+            with contextlib.redirect_stdout(human):
+                status = main(["status", "--input", str(profile)])
+            self.assertEqual(status, 0)
+            self.assertIn("QFabric profile status", human.getvalue())
+
+            machine = io.StringIO()
+            with contextlib.redirect_stdout(machine):
+                status = main(["status", "--input", str(profile), "--json"])
+            self.assertEqual(status, 0)
+            self.assertEqual(json.loads(machine.getvalue())["schema_version"], 1)
+
     def test_abi_check_and_vector_commands(self) -> None:
         root = Path(__file__).resolve().parents[1]
         schema = root / "config/qfabric-abi.json"

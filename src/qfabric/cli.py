@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from .abi_probe import probe_mcu_abi, write_probe_report
 from .abi_tools import build_golden_vectors, run_compile_fail_cases, write_golden_vectors
 from .audit import audit_stage2, write_audit
 from .build import build_stage2
+from .profiling import load_profile, render_status
 from .runtime import parse_add_arguments, run_linux, run_rt
 
 
@@ -62,6 +64,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--root", type=Path, default=Path.cwd())
     run.add_argument("--timeout", type=float, default=2.0)
     run.add_argument("--address", default="unix:///var/run/arduino-router.sock")
+
+    status = subparsers.add_parser("status", help="show the latest persisted QTask profile")
+    status.add_argument("--input", type=Path, default=Path(".qfabric/profile.json"))
+    status.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
 
@@ -146,6 +152,16 @@ def main(argv: list[str] | None = None) -> int:
             for failure in result["failures"]:
                 print(f"- {failure}", file=sys.stderr)
             return 0 if result["status"] == "pass" else 1
+
+        if args.command == "status":
+            if task_arguments:
+                raise ValueError("qf status does not accept task arguments")
+            report = load_profile(args.input)
+            if args.as_json:
+                print(json.dumps(report, indent=2, sort_keys=True))
+            else:
+                print(render_status(report))
+            return 0
 
         if args.task != "add":
             raise ValueError(f"unknown QTask: {args.task}")

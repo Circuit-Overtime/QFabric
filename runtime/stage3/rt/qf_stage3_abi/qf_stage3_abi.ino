@@ -6,6 +6,7 @@
 #include "qf_stage3_helpers.h"
 
 std::array<std::uint8_t, 128> qf_stage3_buffer{};
+abi::ReplayGuard<64> qf_stage3_replay_guard;
 
 String qf_hex(const std::uint8_t* data, std::size_t size) {
   static constexpr char digits[] = "0123456789abcdef";
@@ -72,12 +73,23 @@ std::uint32_t qf_stage3_decode_status(std::uint32_t scenario) {
       qf_stage3_buffer.data() + abi::kHeaderSize, payload_size, decoded_value));
 }
 
+bool qf_stage3_replay_reset() {
+  qf_stage3_replay_guard.reset();
+  return true;
+}
+
+std::uint32_t qf_stage3_replay_status(std::uint32_t epoch, std::uint32_t invocation_id) {
+  return static_cast<std::uint32_t>(qf_stage3_replay_guard.accept(epoch, invocation_id));
+}
+
 void setup() {
   if (!Bridge.begin()) {
     while (true) delay(1000);
   }
   Bridge.provide_safe("qf_stage3_golden_vector", qf_stage3_golden_vector);
   Bridge.provide_safe("qf_stage3_decode_status", qf_stage3_decode_status);
+  Bridge.provide_safe("qf_stage3_replay_reset", qf_stage3_replay_reset);
+  Bridge.provide_safe("qf_stage3_replay_status", qf_stage3_replay_status);
 }
 
 void loop() {

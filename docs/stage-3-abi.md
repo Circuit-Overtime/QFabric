@@ -64,6 +64,10 @@ current. A lower epoch is stale. A repeated invocation ID within the current epo
 The initial reference window retains 64 accepted invocation IDs; this bound must be declared by a
 runtime rather than silently expanded.
 
+Both the reference implementation and generated C++ codec expose the same replay semantics. The
+MCU probe resets its bounded window, accepts an invocation, rejects its duplicate, rejects a lower
+epoch, and accepts the same invocation ID again after advancing to a new epoch.
+
 The canonical machine-readable declarations are in `config/qfabric-abi.json`.
 
 Validate the declarations and regenerate the canonical vectors with:

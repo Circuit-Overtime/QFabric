@@ -18,6 +18,7 @@ from qfabric.abi import (
     canary_eligible,
     decode_frame,
     encode_frame,
+    transition_pinned,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -102,6 +103,13 @@ class QFabricAbiTests(unittest.TestCase):
         self.assertTrue(canary_eligible(Effect.PURE))
         for effect in (Effect.IDEMPOTENT, Effect.STATEFUL, Effect.ACTUATING):
             self.assertFalse(canary_eligible(effect))
+
+    def test_stateful_and_actuating_tasks_require_transition_hooks(self) -> None:
+        for effect in (Effect.STATEFUL, Effect.ACTUATING):
+            self.assertTrue(transition_pinned(effect, False))
+            self.assertFalse(transition_pinned(effect, True))
+        self.assertFalse(transition_pinned(Effect.PURE, False))
+        self.assertFalse(transition_pinned(Effect.IDEMPOTENT, False))
 
     def test_replay_guard_rejects_stale_and_duplicate(self) -> None:
         guard = ReplayGuard(capacity=2)

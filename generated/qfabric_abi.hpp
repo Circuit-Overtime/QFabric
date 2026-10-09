@@ -29,6 +29,42 @@ inline constexpr Effect Q_IDEMPOTENT = Effect::Idempotent;
 inline constexpr Effect Q_STATEFUL = Effect::Stateful;
 inline constexpr Effect Q_ACTUATING = Effect::Actuating;
 constexpr bool canary_eligible(Effect effect) { return effect == Effect::Pure; }
+constexpr bool transition_pinned(Effect effect, bool transition_hooks) {
+  return (effect == Effect::Stateful || effect == Effect::Actuating) &&
+         !transition_hooks;
+}
+
+template <std::size_t Capacity = 64>
+class ReplayGuard {
+ public:
+  static_assert(Capacity > 0);
+  Status accept(std::uint32_t epoch, std::uint64_t invocation_id) {
+    if (initialized_ && epoch < epoch_) return Status::Stale;
+    if (!initialized_ || epoch > epoch_) {
+      initialized_ = true;
+      epoch_ = epoch;
+      count_ = 0;
+      next_ = 0;
+    }
+    for (std::size_t index = 0; index < count_; ++index) {
+      if (seen_[index] == invocation_id) return Status::Duplicate;
+    }
+    if (count_ < Capacity) {
+      seen_[count_++] = invocation_id;
+    } else {
+      seen_[next_] = invocation_id;
+      next_ = (next_ + 1) % Capacity;
+    }
+    return Status::Ok;
+  }
+  void reset() { initialized_ = false; epoch_ = 0; count_ = 0; next_ = 0; }
+ private:
+  std::array<std::uint64_t, Capacity> seen_{};
+  std::uint32_t epoch_ = 0;
+  std::size_t count_ = 0;
+  std::size_t next_ = 0;
+  bool initialized_ = false;
+};
 
 struct Metadata {
   MessageType message_type = MessageType::Request;
@@ -410,7 +446,11 @@ inline Status decode_ProbeRequest(const std::uint8_t* input, std::size_t size,
 
 inline constexpr std::uint32_t kTaskAdd = 1;
 inline constexpr Effect kTaskAddEffect = Effect::Pure;
+inline constexpr bool kTaskAddTransitionHooks = false;
+inline constexpr bool kTaskAddPinned = transition_pinned(kTaskAddEffect, kTaskAddTransitionHooks);
 inline constexpr std::uint32_t kTaskAbiProbe = 2;
 inline constexpr Effect kTaskAbiProbeEffect = Effect::Pure;
+inline constexpr bool kTaskAbiProbeTransitionHooks = false;
+inline constexpr bool kTaskAbiProbePinned = transition_pinned(kTaskAbiProbeEffect, kTaskAbiProbeTransitionHooks);
 
 }  // namespace qfabric::abi

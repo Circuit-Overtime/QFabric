@@ -16,6 +16,13 @@ DECODE_SCENARIOS = {
     "reserved-flags": (5, 1),
 }
 
+REPLAY_SCENARIOS = (
+    ("first-accept", 7, 100, 0),
+    ("duplicate", 7, 100, 6),
+    ("stale-epoch", 6, 101, 5),
+    ("new-epoch", 8, 100, 0),
+)
+
 
 def probe_mcu_abi(
     vectors_path: Path,
@@ -28,6 +35,7 @@ def probe_mcu_abi(
     failures: list[str] = []
     vector_results: list[dict[str, object]] = []
     scenario_results: list[dict[str, object]] = []
+    replay_results: list[dict[str, object]] = []
 
     bridge: Any = _connect_bridge(address)
     try:
@@ -61,6 +69,28 @@ def probe_mcu_abi(
                 failures.append(
                     f"MCU decode status mismatch for {name}: expected {expected}, got {observed}"
                 )
+
+        if bridge.call("qf_stage3_replay_reset", timeout=timeout) is not True:
+            failures.append("MCU replay guard reset failed")
+        for name, epoch, invocation_id, expected in REPLAY_SCENARIOS:
+            observed = bridge.call(
+                "qf_stage3_replay_status", epoch, invocation_id, timeout=timeout
+            )
+            matches = observed == expected
+            replay_results.append(
+                {
+                    "name": name,
+                    "epoch": epoch,
+                    "invocation_id": invocation_id,
+                    "expected_status": expected,
+                    "observed_status": observed,
+                    "matches": matches,
+                }
+            )
+            if not matches:
+                failures.append(
+                    f"MCU replay status mismatch for {name}: expected {expected}, got {observed}"
+                )
     finally:
         bridge.disconnect()
 
@@ -72,6 +102,7 @@ def probe_mcu_abi(
         "status": "pass" if not failures else "fail",
         "vectors": vector_results,
         "decode_scenarios": scenario_results,
+        "replay_scenarios": replay_results,
         "failures": failures,
     }
 

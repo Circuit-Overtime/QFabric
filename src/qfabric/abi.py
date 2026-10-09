@@ -70,6 +70,7 @@ class Task:
     effect: Effect
     request: str
     response: str
+    transition_hooks: bool
 
 
 SCALAR_FORMATS = {
@@ -214,11 +215,14 @@ class Schema:
             _bounded_integer(task_id, 32, False, f"task_id for {name}")
             if name in self.tasks or task_id in task_ids:
                 raise ValueError(f"duplicate task name or id: {name}")
+            transition_hooks = raw_task.get("transition_hooks", False)
+            if not isinstance(transition_hooks, bool):
+                raise ValueError(f"transition_hooks for {name} must be boolean")
             request_size = self._size_of(request, ())
             response_size = self._size_of(response, ())
             if request_size > MAX_PAYLOAD_BYTES or response_size > MAX_PAYLOAD_BYTES:
                 raise ValueError(f"task {name} exceeds the {MAX_PAYLOAD_BYTES}-byte payload limit")
-            task = Task(name, task_id, effect, request, response)
+            task = Task(name, task_id, effect, request, response, transition_hooks)
             self.tasks[name] = task
             task_ids.add(task_id)
 
@@ -364,3 +368,7 @@ class ReplayGuard:
 
 def canary_eligible(effect: Effect) -> bool:
     return effect is Effect.PURE
+
+
+def transition_pinned(effect: Effect, transition_hooks: bool) -> bool:
+    return effect in {Effect.STATEFUL, Effect.ACTUATING} and not transition_hooks

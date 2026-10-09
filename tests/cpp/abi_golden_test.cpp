@@ -51,6 +51,17 @@ int main() {
   static_assert(abi::kMaxPayloadBytes == 988);
   static_assert(abi::canary_eligible(abi::Q_PURE));
   static_assert(!abi::canary_eligible(abi::Q_STATEFUL));
+  static_assert(!abi::kTaskAddPinned);
+  static_assert(abi::transition_pinned(abi::Q_ACTUATING, false));
+  static_assert(!abi::transition_pinned(abi::Q_ACTUATING, true));
+
+  abi::ReplayGuard<2> replay_guard;
+  if (replay_guard.accept(7, 100) != abi::Status::Ok ||
+      replay_guard.accept(7, 100) != abi::Status::Duplicate ||
+      replay_guard.accept(6, 101) != abi::Status::Stale ||
+      replay_guard.accept(8, 100) != abi::Status::Ok) {
+    return 7;
+  }
 
   std::array<std::uint8_t, abi::kMaxMessageBytes> encoded{};
   std::size_t encoded_size = 0;

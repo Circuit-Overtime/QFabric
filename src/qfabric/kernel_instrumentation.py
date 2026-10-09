@@ -256,68 +256,73 @@ def run_kernel_benchmark(
     if not artifact.is_file():
         raise ValueError(f"Linux profile artifact is missing: {artifact}")
 
-    counter_group: PerfCounterGroup | None = None
+    perf_available = False
     perf_error: str | None = "forced-unavailable" if force_fallback else None
     if not force_fallback:
         try:
-            counter_group = PerfCounterGroup.open()
+            probe = PerfCounterGroup.open()
         except OSError as error:
             perf_error = f"[{error.errno}] {error.strerror}"
+        else:
+            probe.close()
+            perf_available = True
 
     samples: list[dict[str, object]] = []
     failures = 0
-    try:
-        for index in range(warmup + iterations):
-            invocation_id = (int(time.time()) & 0xFFFFFFFF) << 32 | (index + 1)
-            counters: dict[str, int] | None = None
-            started = time.perf_counter_ns()
-            try:
-                if counter_group is not None:
+    for index in range(warmup + iterations):
+        invocation_id = (int(time.time()) & 0xFFFFFFFF) << 32 | (index + 1)
+        counters: dict[str, int] | None = None
+        counter_group: PerfCounterGroup | None = None
+        started = time.perf_counter_ns()
+        try:
+            if perf_available:
+                counter_group = PerfCounterGroup.open()
+                try:
                     counter_group.start()
+                    _linux_invocation(
+                        artifact,
+                        invocation_id,
+                        Instrumentation.DISABLED,
+                        timeout=timeout,
+                    )
+                    counters = counter_group.stop()
+                finally:
+                    counter_group.close()
+            else:
                 _linux_invocation(
                     artifact,
                     invocation_id,
                     Instrumentation.DISABLED,
                     timeout=timeout,
                 )
-                if counter_group is not None:
-                    counters = counter_group.stop()
-                outcome = "ok"
-            except (OSError, RuntimeError):
-                outcome = "error"
-                failures += index >= warmup
-                if counter_group is not None:
-                    try:
-                        counter_group.stop()
-                    except OSError:
-                        pass
-            finished = time.perf_counter_ns()
-            if index < warmup:
-                continue
-            end_to_end_ns = finished - started
-            task_clock_ns = None if counters is None else counters["task_clock_ns"]
-            samples.append(
-                {
-                    "sequence": index - warmup + 1,
-                    "outcome": outcome,
-                    "end_to_end_ns": end_to_end_ns,
-                    "task_clock_ns": task_clock_ns,
-                    "non_cpu_ns": (
-                        None
-                        if task_clock_ns is None
-                        else max(end_to_end_ns - task_clock_ns, 0)
-                    ),
-                    "context_switches": (
-                        None if counters is None else counters["context_switches"]
-                    ),
-                    "cpu_migrations": (
-                        None if counters is None else counters["cpu_migrations"]
-                    ),
-                }
-            )
-    finally:
-        if counter_group is not None:
-            counter_group.close()
+            outcome = "ok"
+        except (OSError, RuntimeError):
+            outcome = "error"
+            failures += index >= warmup
+        finished = time.perf_counter_ns()
+        if index < warmup:
+            continue
+        end_to_end_ns = finished - started
+        task_clock_ns = None if counters is None else counters["task_clock_ns"]
+        samples.append(
+            {
+                "sequence": index - warmup + 1,
+                "outcome": outcome,
+                "end_to_end_ns": end_to_end_ns,
+                "task_clock_ns": task_clock_ns,
+                "non_cpu_ns": (
+                    None
+                    if task_clock_ns is None
+                    else max(end_to_end_ns - task_clock_ns, 0)
+                ),
+                "context_switches": (
+                    None if counters is None else counters["context_switches"]
+                ),
+                "cpu_migrations": (
+                    None if counters is None else counters["cpu_migrations"]
+                ),
+            }
+        )
 
     successful = [sample for sample in samples if sample["outcome"] == "ok"]
     return {
@@ -325,7 +330,7 @@ def run_kernel_benchmark(
         "captured_utc": datetime.now(UTC).isoformat(),
         "stage": 10,
         "status": "pass" if failures == 0 else "fail",
-        "mode": "perf" if counter_group is not None else "userspace-fallback",
+        "mode": "perf" if perf_available else "userspace-fallback",
         "configuration": {
             "iterations": iterations,
             "warmup": warmup,

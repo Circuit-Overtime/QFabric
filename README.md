@@ -59,8 +59,12 @@ overhead results are recorded in the
 [Stage 10 specification](docs/stage-10-kernel-instrumentation.md) and
 [Stage 10 findings](docs/stage-10-findings.md).
 
-Stage 11 is the current stage. It completes end-to-end benchmarks, baselines, evaluation, and
-paper-ready results, tracked in [issue #12](https://github.com/Circuit-Overtime/QFabric/issues/12).
+Stage 11 is complete. It evaluates four workload graphs and a loaded flagship scenario against
+seven baselines, including SCHED_FIFO, manual, recovery, and oracle placements. The full evidence
+matrix, honest negative result against tuned Linux, six research-question answers, paper artifacts,
+limitations, and independent audit are recorded in the
+[Stage 11 protocol](docs/stage-11-evaluation.md) and
+[Stage 11 findings](docs/stage-11-findings.md).
 
 ## Local checks
 

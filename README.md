@@ -66,6 +66,13 @@ limitations, and independent audit are recorded in the
 [Stage 11 protocol](docs/stage-11-evaluation.md) and
 [Stage 11 findings](docs/stage-11-findings.md).
 
+## Research paper
+
+The submission-oriented IEEE manuscript, bibliography, reproducible figure and table generator,
+and testbed-photo instructions are in [paper/](paper/). Build the PDF with `make -C paper`.
+Quantitative manuscript assets are regenerated from the audited Stage 11 evaluation report. The
+repository also provides a GitHub-compatible [citation file](CITATION.cff).
+
 ## Local checks
 
 The hardware-independent tests use only Python's standard library:

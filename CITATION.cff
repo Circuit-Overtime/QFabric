@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use QFabric or its evaluation artifact, please cite this software and the accompanying paper."
+title: "QFabric: Contract-Driven Cross-Domain Task Recovery"
+type: software
+authors:
+  - name: "Circuit Overtime"
+version: 0.1.0
+date-released: 2026-10-09
+repository-code: "https://github.com/Circuit-Overtime/QFabric"
+url: "https://github.com/Circuit-Overtime/QFabric"
+abstract: >-
+  A research prototype and reproducibility artifact for empirical timing-contract
+  recovery across Linux and RTOS execution domains on the Arduino UNO Q.
+preferred-citation:
+  type: software
+  authors:
+    - name: "Circuit Overtime"
+  title: "QFabric: Contract-Driven Cross-Domain Task Recovery"
+  year: 2026
+  version: "commit 719ffe0"
+  repository-code: "https://github.com/Circuit-Overtime/QFabric"

@@ -347,6 +347,7 @@ def build_parser() -> argparse.ArgumentParser:
     kernel_audit.add_argument("--stage4-profile", type=Path, required=True)
     kernel_audit.add_argument("--baseline", type=Path, action="append", required=True)
     kernel_audit.add_argument("--perf", type=Path, action="append", required=True)
+    kernel_audit.add_argument("--loaded-perf", type=Path, action="append", required=True)
     kernel_audit.add_argument("--fallback", type=Path, required=True)
     kernel_audit.add_argument("--maximum-p95-overhead-pct", type=float, default=15.0)
     kernel_audit.add_argument("--output", type=Path, required=True)
@@ -830,6 +831,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.stage4_profile,
                 args.baseline,
                 args.perf,
+                args.loaded_perf,
                 args.fallback,
                 maximum_p95_overhead_pct=args.maximum_p95_overhead_pct,
             )

@@ -106,6 +106,7 @@ class QFabricKernelInstrumentationTests(unittest.TestCase):
                 paths["stage4.json"],
                 [paths["baseline.json"]],
                 [paths["perf.json"]],
+                [paths["perf.json"]],
                 paths["fallback.json"],
             )
         self.assertEqual(report["status"], "pass")

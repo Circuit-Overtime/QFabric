@@ -26,6 +26,7 @@ def audit_stage10(
     stage4_profile_path: Path,
     baseline_paths: list[Path],
     perf_paths: list[Path],
+    loaded_perf_paths: list[Path],
     fallback_path: Path,
     *,
     maximum_p95_overhead_pct: float = 15.0,
@@ -36,6 +37,7 @@ def audit_stage10(
     stage4 = _load(stage4_profile_path)
     baseline = [_load(path) for path in baseline_paths]
     perf = [_load(path) for path in perf_paths]
+    loaded_perf = [_load(path) for path in loaded_perf_paths]
     fallback = _load(fallback_path)
     failures: list[str] = []
 
@@ -52,7 +54,8 @@ def audit_stage10(
     if not no_custom_module:
         failures.append("custom kernel module boundary was violated")
     policy_userspace = all(
-        report.get("policy_location") == "userspace" for report in baseline + perf + [fallback]
+        report.get("policy_location") == "userspace"
+        for report in baseline + perf + loaded_perf + [fallback]
     )
     if not policy_userspace:
         failures.append("one or more reports moved policy outside userspace")
@@ -61,7 +64,7 @@ def audit_stage10(
         report.get("status") == "pass"
         and report.get("failures") == 0
         and report.get("successful_samples") == report["configuration"]["iterations"]
-        for report in baseline + perf + [fallback]
+        for report in baseline + perf + loaded_perf + [fallback]
     )
     if not reports_valid:
         failures.append("one or more kernel instrumentation reports are incomplete")
@@ -69,6 +72,8 @@ def audit_stage10(
         failures.append("baseline reports did not use the userspace-only path")
     if any(report.get("mode") != "perf" for report in perf):
         failures.append("instrumented reports did not use perf")
+    if not loaded_perf or any(report.get("mode") != "perf" for report in loaded_perf):
+        failures.append("CPU-loaded perf reports are missing or invalid")
 
     fallback_safe = (
         fallback.get("mode") == "userspace-fallback"
@@ -91,6 +96,14 @@ def audit_stage10(
     )
     if not attribution_complete:
         failures.append("perf samples do not provide a complete timing decomposition")
+
+    loaded_samples = [sample for report in loaded_perf for sample in report["samples"]]
+    scheduler_events_observed = bool(loaded_samples) and all(
+        sample["context_switches"] is not None and sample["cpu_migrations"] is not None
+        for sample in loaded_samples
+    ) and any(sample["context_switches"] > 0 for sample in loaded_samples)
+    if not scheduler_events_observed:
+        failures.append("CPU-loaded campaign did not observe scheduler context switches")
 
     baseline_p95 = _median_metric(baseline, "end_to_end_ns", "p95")
     perf_p95 = _median_metric(perf, "end_to_end_ns", "p95")
@@ -142,6 +155,7 @@ def audit_stage10(
             "stage4_profile": str(stage4_profile_path),
             "baseline": [str(path) for path in baseline_paths],
             "perf": [str(path) for path in perf_paths],
+            "loaded_perf": [str(path) for path in loaded_perf_paths],
             "fallback": str(fallback_path),
         },
         "measurement_gap": {
@@ -165,6 +179,7 @@ def audit_stage10(
             "existing_kernel_interface_selected": selected_perf,
             "before_after_reports_valid": reports_valid,
             "attribution_complete": attribution_complete,
+            "scheduler_events_observed_under_load": scheduler_events_observed,
             "overhead_within_budget": overhead_within_budget,
             "userspace_fallback_safe": fallback_safe,
             "policy_remains_userspace": policy_userspace,

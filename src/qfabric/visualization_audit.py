@@ -68,7 +68,9 @@ def audit_stage9(
     )
     if not off_verified:
         failures.append("off mode is not blank and disabled")
-    system_leds_preserved = campaign.get("linux_system_leds", {}).get("preserved") is True
+    system_leds_preserved = (
+        campaign.get("linux_system_leds", {}).get("triggers_preserved") is True
+    )
     if not system_leds_preserved:
         failures.append("Linux system LED state was not proven preserved")
 

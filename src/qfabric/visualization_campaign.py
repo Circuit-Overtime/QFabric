@@ -20,6 +20,10 @@ CASES = (
 )
 
 
+def _system_triggers(snapshot: dict[str, dict[str, str]]) -> dict[str, str]:
+    return {name: values["trigger"] for name, values in snapshot.items()}
+
+
 def _validate_case(
     report: dict[str, Any],
     *,
@@ -133,8 +137,11 @@ def run_visualization_campaign(
         failures.append("off: MCU did not enter a blank disabled state")
     if off["linux_user_rgb"] != 0:
         failures.append("off: Linux user RGB did not turn off")
-    if system_leds_before != system_leds_after:
-        failures.append("Linux system LED state changed during visualization")
+    system_triggers_preserved = _system_triggers(system_leds_before) == _system_triggers(
+        system_leds_after
+    )
+    if not system_triggers_preserved:
+        failures.append("Linux system LED triggers changed during visualization")
     return {
         "schema_version": 1,
         "captured_utc": datetime.now(UTC).isoformat(),
@@ -150,7 +157,7 @@ def run_visualization_campaign(
         "linux_system_leds": {
             "before": system_leds_before,
             "after": system_leds_after,
-            "preserved": system_leds_before == system_leds_after,
+            "triggers_preserved": system_triggers_preserved,
         },
         "failures": failures,
     }

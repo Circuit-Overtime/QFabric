@@ -56,7 +56,7 @@ class QFabricVisualizationAuditTests(unittest.TestCase):
                     "frame_checksum": 0,
                 }
             },
-            "linux_system_leds": {"preserved": True},
+            "linux_system_leds": {"triggers_preserved": True},
         }
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -92,7 +92,7 @@ class QFabricVisualizationAuditTests(unittest.TestCase):
                                 "frame_checksum": 1,
                             }
                         },
-                        "linux_system_leds": {"preserved": False},
+                        "linux_system_leds": {"triggers_preserved": False},
                     }
                 ),
                 encoding="utf-8",

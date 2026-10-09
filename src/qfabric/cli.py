@@ -30,6 +30,7 @@ from .contracts import (
     replay_contract,
     write_contract_report,
 )
+from .decision_audit import audit_stage8, write_stage8_audit
 from .decision_campaign import run_decision_campaign, write_decision_campaign
 from .decision_history import DecisionStore
 from .decision_records import (
@@ -243,6 +244,14 @@ def build_parser() -> argparse.ArgumentParser:
     history_campaign.add_argument("--rollback-report", type=Path, required=True)
     history_campaign.add_argument("--store", type=Path, required=True)
     history_campaign.add_argument("--output", type=Path, required=True)
+    history_audit = history_subparsers.add_parser(
+        "audit", help="validate complete Stage 8 decision-history evidence"
+    )
+    history_audit.add_argument("--store", type=Path, required=True)
+    history_audit.add_argument("--campaign", type=Path, required=True)
+    history_audit.add_argument("--recommendation-input", type=Path, required=True)
+    history_audit.add_argument("--rollback-report", type=Path, required=True)
+    history_audit.add_argument("--output", type=Path, required=True)
 
     explain = subparsers.add_parser(
         "explain", help="explain an immutable persisted policy decision"
@@ -581,6 +590,21 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "history":
             if task_arguments:
                 raise ValueError("qf history does not accept task arguments")
+            if args.history_command == "audit":
+                source = load_recommendation_input(args.recommendation_input)
+                rollback = load_json_object(args.rollback_report)
+                report = audit_stage8(
+                    args.store,
+                    args.campaign,
+                    source,
+                    rollback,
+                )
+                write_stage8_audit(report, args.output)
+                print(f"Stage 8 audit: {report['status']}")
+                print(f"audit report: {args.output}")
+                for failure in report["failures"]:
+                    print(f"- {failure}", file=sys.stderr)
+                return 0 if report["status"] == "pass" else 1
             if args.history_command == "campaign":
                 source = load_recommendation_input(args.recommendation_input)
                 rollback = load_json_object(args.rollback_report)

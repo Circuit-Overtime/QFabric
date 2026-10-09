@@ -107,3 +107,24 @@ Acceptance requires stable records covering `insufficient_evidence`, `unsafe_sem
 recommendation mutations and infeasibility trace validate policy explanations; they are not
 additional hardware-performance observations. Failed probation remains grounded in the real
 Stage 7 rollback campaign.
+
+## Independent audit
+
+Run the final reproducibility gate over the persisted journal and campaign report:
+
+```bash
+qf history audit \
+  --store data/processed/stage8/decisions.jsonl \
+  --campaign data/processed/stage8/decision-campaign.json \
+  --recommendation-input \
+  data/processed/stage6/stage6-recommendations-01/recommendation-input.json \
+  --rollback-report data/processed/stage7/hardware-rollback.json \
+  --output data/processed/stage8/stage8-audit.json
+```
+
+The audit first validates the persisted hash chain. It then regenerates a separate expected
+journal from the Stage 6 and Stage 7 sources and compares every policy-bearing payload while
+excluding only capture timestamps and the hashes derived from them. It independently replays all
+decisions, checks the campaign summary, requires policy version 1, validates contiguous IDs and
+all six explanation classifications, and confirms that text and JSON expose the same recorded
+input, outcome, and structured facts.

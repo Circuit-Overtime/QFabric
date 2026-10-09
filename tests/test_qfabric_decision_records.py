@@ -7,7 +7,12 @@ import unittest
 from pathlib import Path
 
 from qfabric.cli import main
-from qfabric.decision_campaign import REQUIRED_CLASSIFICATIONS, run_decision_campaign
+from qfabric.decision_audit import audit_stage8
+from qfabric.decision_campaign import (
+    REQUIRED_CLASSIFICATIONS,
+    run_decision_campaign,
+    write_decision_campaign,
+)
 from qfabric.decision_history import DecisionStore
 from qfabric.decision_records import (
     record_hardware_recovery,
@@ -253,6 +258,29 @@ class QFabricDecisionRecordTests(unittest.TestCase):
             self.assertTrue(all(report["checks"].values()))
             with self.assertRaisesRegex(ValueError, "empty decision history"):
                 run_decision_campaign(store_path, source, hardware_report(source))
+
+    def test_stage8_audit_regenerates_payloads_and_detects_report_tampering(self):
+        source = recommendation_input()
+        rollback = hardware_report(source)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store_path = root / "decisions.jsonl"
+            campaign_path = root / "campaign.json"
+            campaign = run_decision_campaign(store_path, source, rollback)
+            write_decision_campaign(campaign, campaign_path)
+
+            audit = audit_stage8(store_path, campaign_path, source, rollback)
+            self.assertEqual(audit["status"], "pass")
+            self.assertTrue(all(audit["checks"].values()))
+
+            campaign["record_count"] += 1
+            write_decision_campaign(campaign, campaign_path)
+            audit = audit_stage8(store_path, campaign_path, source, rollback)
+            self.assertEqual(audit["status"], "fail")
+            self.assertIn(
+                "campaign report does not match regenerated evidence",
+                audit["failures"],
+            )
 
 
 if __name__ == "__main__":

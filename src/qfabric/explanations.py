@@ -47,6 +47,11 @@ def render_explanation(explanation: dict[str, Any]) -> str:
         f"- record SHA-256: {explanation['record_sha256']}",
         "Decision evidence",
     ]
+    lines.extend(explanation_evidence_lines(explanation))
+    return "\n".join(lines)
+
+
+def explanation_evidence_lines(explanation: dict[str, Any]) -> list[str]:
     complete_facts = {
         "facts": explanation["facts"],
         "input": explanation["input"],
@@ -54,9 +59,10 @@ def render_explanation(explanation: dict[str, Any]) -> str:
         "previous_record_sha256": explanation["previous_record_sha256"],
         "schema_version": explanation["schema_version"],
     }
-    for path, value in _flatten(complete_facts, ""):
-        lines.append(f"- {path}: {json.dumps(value, sort_keys=True)}")
-    return "\n".join(lines)
+    return [
+        f"- {path}: {json.dumps(value, sort_keys=True)}"
+        for path, value in _flatten(complete_facts, "")
+    ]
 
 
 def render_replay(report: dict[str, Any]) -> str:

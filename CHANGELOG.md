@@ -3,6 +3,16 @@
 All notable changes to QFabric are documented in this file. The project follows
 Semantic Versioning.
 
+## [1.0.1] - 2026-10-09
+
+### Corrected
+
+- Added Anwesha Chakraborty as a co-author in the package metadata,
+  `CITATION.cff`, manuscript author block, PDF metadata, and QFabric artifact
+  bibliography entry.
+- Issued a patch release so the corrected authorship is carried by immutable
+  package and research artifacts without rewriting the `v1.0.0` release.
+
 ## [1.0.0] - 2026-10-09
 
 ### Stable release
@@ -49,5 +59,6 @@ Semantic Versioning.
 - Claims are empirical soft real-time claims, not hard real-time guarantees.
 - Hardware control commands require the matching repository firmware and board.
 
+[1.0.1]: https://github.com/Circuit-Overtime/QFabric/releases/tag/v1.0.1
 [1.0.0]: https://github.com/Circuit-Overtime/QFabric/releases/tag/v1.0.0
 [0.1.0]: https://github.com/Circuit-Overtime/QFabric/releases/tag/v0.1.0

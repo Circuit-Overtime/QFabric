@@ -6,7 +6,10 @@ authors:
   - family-names: "Bhattacharya"
     given-names: "Ayushman"
     email: "ayushman@myceli.ai"
-version: 1.0.0
+  - family-names: "Chakraborty"
+    given-names: "Anwesha"
+    email: "anwesha.elixpo@gmail.com"
+version: 1.0.1
 date-released: 2026-10-09
 repository-code: "https://github.com/Circuit-Overtime/QFabric"
 url: "https://github.com/Circuit-Overtime/QFabric"
@@ -19,7 +22,10 @@ preferred-citation:
     - family-names: "Bhattacharya"
       given-names: "Ayushman"
       email: "ayushman@myceli.ai"
+    - family-names: "Chakraborty"
+      given-names: "Anwesha"
+      email: "anwesha.elixpo@gmail.com"
   title: "QFabric: Contract-Driven Cross-Domain Task Recovery"
   year: 2026
-  version: "v1.0.0"
+  version: "v1.0.1"
   repository-code: "https://github.com/Circuit-Overtime/QFabric"

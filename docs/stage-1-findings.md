@@ -1,4 +1,6 @@
-# Stage 1 preliminary findings
+# Stage 1 findings
+
+**Stage 1 status: complete with documented platform limitations (2026-10-09).**
 
 No timing contract is selected in this document. These results establish the initial natural
 idle and CPU-loaded behavior of one Arduino UNO Q configuration and identify follow-up controls.
@@ -29,6 +31,8 @@ idle and CPU-loaded behavior of one Arduino UNO Q configuration and identify fol
   and the wrapper restored `schedutil` afterward.
 - Raw and processed data are retained on the UNO Q and backed up under the matching local
   `data/` paths, which remain intentionally untracked.
+- Across the baseline, controlled-governor, concurrency, LED, and clock campaigns, the retained
+  evidence contains 136,800 measurements with zero failed samples.
 
 The table reports the mean of each repetition's percentile. Times are end-to-end Linux-observed
 RPC latency.
@@ -175,10 +179,36 @@ sample in the first and last 10% windows; alignment uncertainty is half the comp
   necessary for comparisons over time, but this RPC bracketing method still cannot justify a
   sub-millisecond one-way latency claim. No MCU 32-bit microsecond wrap occurred during an
   individual run; the analyzer's wrap path remains covered by synthetic tests.
+- The final LED-profile firmware build uses 103,892 of 786,432 flash bytes (13.2%) and 41,508 of
+  262,144 global-data bytes (15.8%). Safe MCU introspection reports configured 32 KiB kernel heap,
+  32 KiB main stack, 500-byte Bridge thread stack, 1,024-byte decoder buffer, and 256-byte RPC
+  request buffer. Runtime stack watermark, heap utilization, and direct RouterBridge queue depth
+  are unavailable in the stock UNO Q Zephyr configuration; practical queue behavior is represented
+  by the bounded concurrency campaigns and loop-gap diagnostics.
 
-## Required follow-up
+## Recommendations for later contract stages
 
-- Implement reset-safe payload boundary probing above 128 bytes.
-- Explain the loaded reverse-path distribution with Router or scheduler tracing and continuous
-  frequency telemetry; do not derive a contract threshold from its mean alone.
-- Record MCU queue, memory, and utilization headroom before proposing contract thresholds.
+- Treat 128 bytes as the largest demonstrated-safe application payload. Do not advertise support
+  above it until a reset-safe recovery mechanism exists.
+- Use separate idle and loaded p99 distributions when proposing latency thresholds. Do not derive
+  a contract from means or from the frequency-assisted loaded medians.
+- Use four concurrent callers as the initial contract-design operating point. Eight is verified
+  but has substantially higher tail latency and only 2.66 times single-worker throughput.
+- Budget the roughly 1.5% matrix-scanning latency effect, but do not add a rate-dependent penalty
+  for 10-60 application frame writes/s unless later workloads contradict this result.
+- Keep cross-domain claims round-trip based. If a later design needs one-way timing, compensate
+  the observed clock drift and retain at least the measured alignment uncertainty.
+- Treat configured memory capacities and build sizes as bounds, not live free-memory guarantees.
+
+## Accepted limitations and deferred work
+
+- The exact failure boundary between 128 and 256 payload bytes is deliberately unresolved. A
+  256-byte probe caused sustained loss of MCU RPC service, so further boundary work is deferred
+  until recovery can be automated and isolated from baseline firmware.
+- The loaded reverse-path bimodality is characterized but not causally attributed. Router or
+  scheduler tracing and continuous frequency telemetry are deferred; later contracts must use its
+  measured distribution rather than an assumed cause.
+- Live MCU stack, heap, thread-utilization, and direct queue-depth counters are unavailable without
+  a custom Zephyr build. Stage 1 retains the stock-platform capacities, build usage, loop gaps,
+  bounded concurrency results, and unsafe-allocation negative result instead of fabricating live
+  headroom values.

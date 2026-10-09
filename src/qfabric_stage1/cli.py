@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from .analysis import analyze
+from .audit import audit_stage1, write_audit
 from .bridge_runner import (
     MATRIX_PROFILE_MODES,
     check_bridge,
@@ -86,6 +87,10 @@ def build_parser() -> argparse.ArgumentParser:
     analysis.add_argument("--input", type=Path, required=True)
     analysis.add_argument("--json", type=Path, required=True)
     analysis.add_argument("--csv", type=Path, required=True)
+
+    audit = subparsers.add_parser("audit", help="validate the complete local Stage 1 evidence")
+    audit.add_argument("--root", type=Path, default=Path.cwd())
+    audit.add_argument("--output", type=Path, required=True)
     return parser
 
 
@@ -275,6 +280,15 @@ def capture_resources(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.command == "audit":
+            result = audit_stage1(args.root.resolve())
+            write_audit(result, args.output)
+            for check in result["checks"]:
+                marker = "PASS" if check["passed"] else "FAIL"
+                print(f"[{marker}] {check['name']}: {check['detail']}")
+            print(f"Stage 1 audit: {result['status']}")
+            print(f"report: {args.output}")
+            return 0 if result["status"] == "pass" else 1
         if args.command == "analyze":
             result = analyze(args.input, args.json, args.csv)
             print(json.dumps(result, indent=2, sort_keys=True))

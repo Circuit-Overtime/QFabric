@@ -513,6 +513,25 @@ Stage 1 is complete only when issue #2 contains:
 - LED update overhead; and
 - reviewed recommendations for later contract thresholds.
 
+After all board results have been copied to the workstation, capture the final firmware build and
+run the local evidence audit:
+
+```bash
+arduino-cli compile --json \
+  --fqbn arduino:zephyr:unoq \
+  benchmarks/stage1/mcu/stage1_probe \
+  > data/raw/resources/mcu-build-stage1-final.json
+
+qf-stage1 audit \
+  --root . \
+  --output data/processed/stage1-audit.json
+```
+
+The audit validates 136,800 expected samples, zero failures, campaign metadata, load-generator
+logs, resource snapshots, the exact final build sizes, reproduction commands, and explicit
+limitations. A `pass` report closes the local evidence gate; attach that report and
+`docs/stage-1-findings.md` to issue #2 before closing the issue.
+
 ## Official references
 
 - [UNO Q user manual](https://docs.arduino.cc/tutorials/uno-q/user-manual/)

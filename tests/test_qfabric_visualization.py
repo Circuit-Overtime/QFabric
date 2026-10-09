@@ -117,6 +117,30 @@ class QFabricVisualizationTests(unittest.TestCase):
         self.assertEqual(item.jitter_ns, 3_000_000)
         self.assertEqual(item.jitter_bucket, 3)
 
+    def test_insufficient_evidence_maps_to_unknown_without_infeasible_overlay(self):
+        record = {
+            "decision_id": 3,
+            "task": "add",
+            "kind": "recommendation",
+            "facts": {
+                "decision": {
+                    "classifications": ["insufficient_evidence"],
+                    "current_domain": "linux",
+                    "move_accepted": False,
+                    "selected_domain": None,
+                },
+                "candidates": [
+                    {
+                        "domain": "linux",
+                        "contract": {"state": "SATISFIED"},
+                    }
+                ],
+            },
+        }
+        item = telemetry_from_decision(record, slot=0)
+        self.assertEqual(item.contract_state, "UNKNOWN")
+        self.assertEqual(item.event, VisualEvent.STABLE)
+
 
 if __name__ == "__main__":
     unittest.main()

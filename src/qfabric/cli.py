@@ -71,6 +71,11 @@ from .recovery_evidence import (
 )
 from .recovery_scenarios import run_recovery_scenarios, write_recovery_scenarios
 from .runtime import parse_add_arguments, run_linux, run_rt
+from .visualization_audit import audit_stage9, write_stage9_audit
+from .visualization_campaign import (
+    run_visualization_campaign,
+    write_visualization_campaign,
+)
 from .visualization_runtime import set_view
 
 
@@ -287,6 +292,29 @@ def build_parser() -> argparse.ArgumentParser:
     view.add_argument("--timeout", type=float, default=2.0)
     view.add_argument("--address", default="unix:///var/run/arduino-router.sock")
     view.add_argument("--json", action="store_true", dest="as_json")
+
+    view_campaign = subparsers.add_parser(
+        "view-campaign", help="exercise every Stage 9 physical visualization state"
+    )
+    view_campaign.add_argument("--history", type=Path, required=True)
+    view_campaign.add_argument("--refresh-hz", type=int, default=8)
+    view_campaign.add_argument("--overlay-ms", type=int, default=100)
+    view_campaign.add_argument("--timeout", type=float, default=2.0)
+    view_campaign.add_argument("--address", default="unix:///var/run/arduino-router.sock")
+    view_campaign.add_argument("--output", type=Path, required=True)
+
+    view_audit = subparsers.add_parser(
+        "view-audit", help="audit Stage 9 hardware coverage and overhead"
+    )
+    view_audit.add_argument("--campaign", type=Path, required=True)
+    view_audit.add_argument(
+        "--disabled-profile", type=Path, action="append", required=True
+    )
+    view_audit.add_argument(
+        "--enabled-profile", type=Path, action="append", required=True
+    )
+    view_audit.add_argument("--maximum-p95-regression-pct", type=float, default=15.0)
+    view_audit.add_argument("--output", type=Path, required=True)
 
     contract = subparsers.add_parser(
         "contract", help="evaluate an empirical soft real-time contract"
@@ -706,6 +734,39 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"- changed pixels: {report['diagnostics']['changed_pixels']}")
                 print(f"- maximum draw: {report['diagnostics']['maximum_draw_us']} us")
             return 0
+
+        if args.command == "view-campaign":
+            if task_arguments:
+                raise ValueError("qf view-campaign does not accept task arguments")
+            report = run_visualization_campaign(
+                args.history,
+                args.address,
+                refresh_hz=args.refresh_hz,
+                overlay_ms=args.overlay_ms,
+                timeout=args.timeout,
+            )
+            write_visualization_campaign(report, args.output)
+            print(f"Stage 9 visualization campaign: {report['status']}")
+            print(f"campaign report: {args.output}")
+            for failure in report["failures"]:
+                print(f"- {failure}", file=sys.stderr)
+            return 0 if report["status"] == "pass" else 1
+
+        if args.command == "view-audit":
+            if task_arguments:
+                raise ValueError("qf view-audit does not accept task arguments")
+            report = audit_stage9(
+                args.campaign,
+                args.disabled_profile,
+                args.enabled_profile,
+                maximum_p95_regression_pct=args.maximum_p95_regression_pct,
+            )
+            write_stage9_audit(report, args.output)
+            print(f"Stage 9 audit: {report['status']}")
+            print(f"audit report: {args.output}")
+            for failure in report["failures"]:
+                print(f"- {failure}", file=sys.stderr)
+            return 0 if report["status"] == "pass" else 1
 
         if args.command == "contract":
             if task_arguments:

@@ -119,16 +119,22 @@ def telemetry_from_decision(record: dict[str, Any], *, slot: int) -> TaskTelemet
     facts = record["facts"]
     decision = facts["decision"]
     if record["kind"] == "recommendation":
+        classifications = set(decision.get("classifications", []))
         domain = decision["selected_domain"] or decision["current_domain"]
         source = decision["current_domain"]
         selected = _candidate(record, domain)
-        contract_state = "UNKNOWN" if selected is None else selected["contract"]["state"]
+        evidence_unknown = "insufficient_evidence" in classifications
+        contract_state = (
+            "UNKNOWN"
+            if evidence_unknown or selected is None
+            else selected["contract"]["state"]
+        )
         event = (
             VisualEvent.TRANSITION
             if decision["move_accepted"]
             else (
                 VisualEvent.INFEASIBLE
-                if decision["selected_domain"] is None
+                if decision["selected_domain"] is None and not evidence_unknown
                 else VisualEvent.STABLE
             )
         )

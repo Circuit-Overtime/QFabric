@@ -13,6 +13,7 @@ from .abi_probe import probe_mcu_abi, write_probe_report
 from .abi_tools import build_golden_vectors, run_compile_fail_cases, write_golden_vectors
 from .audit import audit_stage2, write_audit
 from .build import build_stage2
+from .profile_analysis import analyze_profile, write_profile_analysis
 from .profile_runner import run_profile_campaign
 from .profiling import Instrumentation, load_profile, render_status, write_profile
 from .runtime import parse_add_arguments, run_linux, run_rt
@@ -87,6 +88,13 @@ def build_parser() -> argparse.ArgumentParser:
     profile.add_argument("--root", type=Path, default=Path.cwd())
     profile.add_argument("--output", type=Path, default=Path(".qfabric/profile.json"))
     profile.add_argument("--json", action="store_true", dest="as_json")
+
+    profile_analyze = subparsers.add_parser(
+        "profile-analyze", help="independently verify profile metrics and overhead"
+    )
+    profile_analyze.add_argument("--input", type=Path, required=True)
+    profile_analyze.add_argument("--output", type=Path, required=True)
+    profile_analyze.add_argument("--tolerance-pct", type=float, default=0.01)
     return parser
 
 
@@ -214,6 +222,24 @@ def main(argv: list[str] | None = None) -> int:
             print(rendered)
             print(f"profile report: {args.output}")
             return 0
+
+        if args.command == "profile-analyze":
+            if task_arguments:
+                raise ValueError("qf profile-analyze does not accept task arguments")
+            report = load_profile(args.input)
+            analysis = analyze_profile(report, tolerance_pct=args.tolerance_pct)
+            write_profile_analysis(analysis, args.output)
+            print(f"Stage 4 profile analysis: {analysis['status']}")
+            print(f"analysis report: {args.output}")
+            for overhead in analysis["instrumentation_overhead"]:
+                print(
+                    f"- {overhead['domain']}/{overhead['mode']}: "
+                    f"mean {overhead['mean_delta_pct']:+.3f}%, "
+                    f"p95 {overhead['p95_delta_pct']:+.3f}%"
+                )
+            for failure in analysis["failures"]:
+                print(f"- {failure}", file=sys.stderr)
+            return 0 if analysis["status"] == "pass" else 1
 
         if args.task != "add":
             raise ValueError(f"unknown QTask: {args.task}")

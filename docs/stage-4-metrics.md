@@ -91,3 +91,15 @@ qf status --input data/processed/stage4/profile-smoke.json --json
 Use `--mode all` for a disabled/reduced/full overhead comparison. Diagnostic Bridge calls occur
 after the measured RT interval, so reading the MCU-local measurement cannot inflate the recorded
 end-to-end latency.
+
+Independently recompute every stored aggregate and calculate instrumentation deltas with:
+
+```bash
+qf profile-analyze \
+  --input data/processed/stage4/profile-overhead.json \
+  --output data/processed/stage4/profile-overhead-analysis.json
+```
+
+The reference path uses Python's independent `statistics` implementation for mean and population
+standard deviation and separately recomputes the ordered percentiles. The documented tolerance is
+0.01% with an absolute floor of 1 ns.

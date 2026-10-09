@@ -193,6 +193,10 @@ class Schema:
         if not isinstance(types, dict) or not isinstance(tasks, list):
             raise ValueError("schema requires object 'types' and array 'tasks'")
         self.types: dict[str, dict[str, Any]] = types
+        for type_name in self.types:
+            if not isinstance(type_name, str) or not type_name.isidentifier():
+                raise ValueError(f"invalid ABI type name: {type_name!r}")
+            self._size_of(type_name, ())
         self.tasks: dict[str, Task] = {}
         task_ids: set[int] = set()
         for raw_task in tasks:

@@ -71,8 +71,18 @@ Validate the declarations and regenerate the canonical vectors with:
 ```bash
 qf abi check
 qf abi vectors
+qf abi generate
 ```
 
 The committed `abi/golden-vectors.json` file is the language-independent source of truth for the
 Linux and MCU codec tests. Implementations must match its payload and complete-frame bytes; they
 must not generate expectations from one target and use those expectations to validate the other.
+The generated `generated/qfabric_abi.hpp` codec uses explicit byte readers and writers rather than
+copying C++ object representations. Both targets compile this same header.
+
+After installing the Stage 3 firmware, compare the MCU output with the independent committed
+vectors and exercise its defensive decoder with:
+
+```bash
+qf abi probe --output data/processed/stage3-mcu-abi-probe.json
+```

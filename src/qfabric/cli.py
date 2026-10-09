@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 
 from .abi import Schema
+from .abi_codegen import generate_cpp_header, write_cpp_header
+from .abi_probe import probe_mcu_abi, write_probe_report
 from .abi_tools import build_golden_vectors, write_golden_vectors
 from .audit import audit_stage2, write_audit
 from .build import build_stage2
@@ -25,6 +27,16 @@ def build_parser() -> argparse.ArgumentParser:
     abi_vectors = abi_subparsers.add_parser("vectors", help="generate canonical golden vectors")
     abi_vectors.add_argument("--schema", type=Path, default=Path("config/qfabric-abi.json"))
     abi_vectors.add_argument("--output", type=Path, default=Path("abi/golden-vectors.json"))
+    abi_generate = abi_subparsers.add_parser("generate", help="generate the C++ ABI codec")
+    abi_generate.add_argument("--schema", type=Path, default=Path("config/qfabric-abi.json"))
+    abi_generate.add_argument(
+        "--output", type=Path, default=Path("generated/qfabric_abi.hpp")
+    )
+    abi_probe = abi_subparsers.add_parser("probe", help="verify the generated codec on the MCU")
+    abi_probe.add_argument("--vectors", type=Path, default=Path("abi/golden-vectors.json"))
+    abi_probe.add_argument("--output", type=Path, required=True)
+    abi_probe.add_argument("--timeout", type=float, default=2.0)
+    abi_probe.add_argument("--address", default="unix:///var/run/arduino-router.sock")
 
     audit = subparsers.add_parser("audit", help="validate the complete Stage 2 evidence")
     audit.add_argument("--root", type=Path, default=Path.cwd())
@@ -71,9 +83,22 @@ def main(argv: list[str] | None = None) -> int:
                     f"{len(schema.types)} named types"
                 )
                 return 0
-            vectors = build_golden_vectors(args.schema)
-            write_golden_vectors(vectors, args.output)
-            print(f"golden vectors: {args.output}")
+            if args.abi_command == "vectors":
+                vectors = build_golden_vectors(args.schema)
+                write_golden_vectors(vectors, args.output)
+                print(f"golden vectors: {args.output}")
+                return 0
+            if args.abi_command == "probe":
+                report = probe_mcu_abi(args.vectors, args.address, timeout=args.timeout)
+                write_probe_report(report, args.output)
+                print(f"Stage 3 MCU ABI probe: {report['status']}")
+                print(f"probe report: {args.output}")
+                for failure in report["failures"]:
+                    print(f"- {failure}", file=sys.stderr)
+                return 0 if report["status"] == "pass" else 1
+            header = generate_cpp_header(args.schema)
+            write_cpp_header(header, args.output)
+            print(f"generated C++ codec: {args.output}")
             return 0
 
         if args.command == "build":

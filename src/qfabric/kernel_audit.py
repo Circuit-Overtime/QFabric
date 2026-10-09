@@ -65,7 +65,7 @@ def audit_stage10(
     )
     if not reports_valid:
         failures.append("one or more kernel instrumentation reports are incomplete")
-    if any(report.get("mode") != "userspace-fallback" for report in baseline):
+    if any(report.get("mode") != "userspace-baseline" for report in baseline):
         failures.append("baseline reports did not use the userspace-only path")
     if any(report.get("mode") != "perf" for report in perf):
         failures.append("instrumented reports did not use perf")

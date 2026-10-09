@@ -6,6 +6,8 @@ import fcntl
 import json
 import os
 import platform
+import select
+import signal
 import statistics
 import struct
 import time
@@ -69,18 +71,24 @@ def _syscall_number(machine: str | None = None) -> int:
     raise OSError(errno.ENOSYS, f"perf_event_open syscall is unknown on {architecture}")
 
 
-def _open_perf_event(config: int, *, group_fd: int = -1) -> int:
+def _open_perf_event(
+    config: int,
+    *,
+    group_fd: int = -1,
+    pid: int = 0,
+    inherit: bool = True,
+) -> int:
     attributes = PerfEventAttr()
     attributes.type = PERF_TYPE_SOFTWARE
     attributes.size = ctypes.sizeof(PerfEventAttr)
     attributes.config = config
     # disabled, inherit into the QTask child, exclude kernel, exclude hypervisor
-    attributes.flags = (1 << 0) | (1 << 1) | (1 << 5) | (1 << 6)
+    attributes.flags = (1 << 0) | (int(inherit) << 1) | (1 << 5) | (1 << 6)
     libc = ctypes.CDLL(None, use_errno=True)
     result = libc.syscall(
         _syscall_number(),
         ctypes.byref(attributes),
-        0,
+        pid,
         -1,
         group_fd,
         0,
@@ -96,12 +104,17 @@ class PerfCounterGroup:
     descriptors: dict[str, int]
 
     @classmethod
-    def open(cls) -> PerfCounterGroup:
+    def open(cls, *, pid: int = 0, inherit: bool = True) -> PerfCounterGroup:
         descriptors: dict[str, int] = {}
         try:
             for name, config in PERF_EVENTS.items():
                 group_fd = next(iter(descriptors.values()), -1)
-                descriptors[name] = _open_perf_event(config, group_fd=group_fd)
+                descriptors[name] = _open_perf_event(
+                    config,
+                    group_fd=group_fd,
+                    pid=pid,
+                    inherit=inherit,
+                )
             return cls(descriptors)
         except OSError:
             for descriptor in descriptors.values():
@@ -242,6 +255,87 @@ def _summaries(samples: list[dict[str, Any]]) -> dict[str, dict[str, int | float
     }
 
 
+def _parse_runner_output(output: str, invocation_id: int) -> None:
+    fields = output.split()
+    if len(fields) != 3:
+        raise RuntimeError("Linux profile runner returned an invalid record")
+    try:
+        observed_id, result, _local_ns = (int(field, 10) for field in fields)
+    except ValueError as error:
+        raise RuntimeError("Linux profile runner returned non-integer data") from error
+    if observed_id != invocation_id or result != 5:
+        raise RuntimeError("Linux profile runner returned an invalid correlated result")
+
+
+def _controlled_linux_invocation(
+    artifact: Path,
+    invocation_id: int,
+    *,
+    timeout: float,
+    use_perf: bool,
+) -> tuple[int, dict[str, int] | None]:
+    read_fd, write_fd = os.pipe()
+    child = os.fork()
+    if child == 0:
+        try:
+            os.close(read_fd)
+            os.dup2(write_fd, 1)
+            os.dup2(write_fd, 2)
+            os.close(write_fd)
+            os.kill(os.getpid(), signal.SIGSTOP)
+            os.execv(
+                str(artifact),
+                [str(artifact), str(invocation_id), "0", "2", "3"],
+            )
+        except BaseException:
+            os._exit(127)
+
+    os.close(write_fd)
+    counter_group: PerfCounterGroup | None = None
+    pid_fd: int | None = None
+    reaped = False
+    try:
+        stopped_pid, status = os.waitpid(child, os.WUNTRACED)
+        if stopped_pid != child or not os.WIFSTOPPED(status):
+            raise RuntimeError("QTask child did not enter its controlled start boundary")
+        pid_fd = os.pidfd_open(child)
+        if use_perf:
+            counter_group = PerfCounterGroup.open(pid=child, inherit=False)
+            counter_group.start()
+        started = time.perf_counter_ns()
+        os.kill(child, signal.SIGCONT)
+        ready, _, _ = select.select([pid_fd], [], [], timeout)
+        if not ready:
+            os.kill(child, signal.SIGKILL)
+            os.waitpid(child, 0)
+            reaped = True
+            raise TimeoutError("controlled Linux QTask timed out")
+        observed_pid, status = os.waitpid(child, 0)
+        reaped = True
+        finished = time.perf_counter_ns()
+        counters = None if counter_group is None else counter_group.stop()
+        output = os.read(read_fd, 4096).decode("utf-8", errors="replace")
+        if observed_pid != child or not os.WIFEXITED(status) or os.WEXITSTATUS(status) != 0:
+            raise RuntimeError(f"controlled Linux QTask failed: {output.strip()}")
+        _parse_runner_output(output, invocation_id)
+        return finished - started, counters
+    finally:
+        if counter_group is not None:
+            counter_group.close()
+        if pid_fd is not None:
+            os.close(pid_fd)
+        if not reaped:
+            try:
+                os.kill(child, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            try:
+                os.waitpid(child, 0)
+            except ChildProcessError:
+                pass
+        os.close(read_fd)
+
+
 def run_kernel_benchmark(
     root: Path,
     *,
@@ -249,6 +343,7 @@ def run_kernel_benchmark(
     warmup: int,
     timeout: float,
     force_fallback: bool = False,
+    baseline: bool = False,
 ) -> dict[str, object]:
     if iterations < 1 or warmup < 0:
         raise ValueError("kernel benchmark iterations must be positive and warmup nonnegative")
@@ -256,9 +351,11 @@ def run_kernel_benchmark(
     if not artifact.is_file():
         raise ValueError(f"Linux profile artifact is missing: {artifact}")
 
+    if force_fallback and baseline:
+        raise ValueError("kernel benchmark cannot force fallback and baseline together")
     perf_available = False
     perf_error: str | None = "forced-unavailable" if force_fallback else None
-    if not force_fallback:
+    if not force_fallback and not baseline:
         try:
             probe = PerfCounterGroup.open()
         except OSError as error:
@@ -272,22 +369,22 @@ def run_kernel_benchmark(
     for index in range(warmup + iterations):
         invocation_id = (int(time.time()) & 0xFFFFFFFF) << 32 | (index + 1)
         counters: dict[str, int] | None = None
-        counter_group: PerfCounterGroup | None = None
         started = time.perf_counter_ns()
         try:
             if perf_available:
-                counter_group = PerfCounterGroup.open()
-                try:
-                    counter_group.start()
-                    _linux_invocation(
-                        artifact,
-                        invocation_id,
-                        Instrumentation.DISABLED,
-                        timeout=timeout,
-                    )
-                    counters = counter_group.stop()
-                finally:
-                    counter_group.close()
+                end_to_end_ns, counters = _controlled_linux_invocation(
+                    artifact,
+                    invocation_id,
+                    timeout=timeout,
+                    use_perf=True,
+                )
+            elif baseline:
+                end_to_end_ns, counters = _controlled_linux_invocation(
+                    artifact,
+                    invocation_id,
+                    timeout=timeout,
+                    use_perf=False,
+                )
             else:
                 _linux_invocation(
                     artifact,
@@ -295,6 +392,7 @@ def run_kernel_benchmark(
                     Instrumentation.DISABLED,
                     timeout=timeout,
                 )
+                end_to_end_ns = time.perf_counter_ns() - started
             outcome = "ok"
         except (OSError, RuntimeError):
             outcome = "error"
@@ -302,7 +400,8 @@ def run_kernel_benchmark(
         finished = time.perf_counter_ns()
         if index < warmup:
             continue
-        end_to_end_ns = finished - started
+        if outcome != "ok":
+            end_to_end_ns = finished - started
         task_clock_ns = None if counters is None else counters["task_clock_ns"]
         samples.append(
             {
@@ -330,7 +429,11 @@ def run_kernel_benchmark(
         "captured_utc": datetime.now(UTC).isoformat(),
         "stage": 10,
         "status": "pass" if failures == 0 else "fail",
-        "mode": "perf" if perf_available else "userspace-fallback",
+        "mode": (
+            "perf"
+            if perf_available
+            else "userspace-baseline" if baseline else "userspace-fallback"
+        ),
         "configuration": {
             "iterations": iterations,
             "warmup": warmup,

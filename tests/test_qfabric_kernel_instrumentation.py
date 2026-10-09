@@ -90,7 +90,7 @@ class QFabricKernelInstrumentationTests(unittest.TestCase):
             values = {
                 "capabilities.json": capabilities,
                 "stage4.json": stage4,
-                "baseline.json": benchmark("userspace-fallback", p95=8_000_000),
+                "baseline.json": benchmark("userspace-baseline", p95=8_000_000),
                 "perf.json": benchmark("perf", p95=8_200_000),
                 "fallback.json": benchmark(
                     "userspace-fallback", p95=8_000_000, forced=True

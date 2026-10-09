@@ -2,6 +2,8 @@
 
 Stage 4 profile reports use schema version 1. Each sample is identified by the ABI epoch and a
 unique 64-bit invocation ID. Reports group measurements by task and actual execution domain.
+The completed hardware results and limitations are recorded in the
+[Stage 4 findings](stage-4-findings.md).
 
 ## Clock discipline
 

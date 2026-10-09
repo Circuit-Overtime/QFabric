@@ -18,7 +18,13 @@ Stage 3 is complete. It defines the versioned cross-domain ABI, generated serial
 protection, defensive decoding, and effect classes. The implementation and hardware audit are
 recorded in the [Stage 3 findings](docs/stage-3-findings.md).
 
-Stage 4 implements correlated end-to-end QTask profiling with bounded, measurable overhead.
+Stage 4 is complete. It provides correlated end-to-end QTask profiling, strict cross-clock
+measurement semantics, bounded sample windows, independently verified aggregates, and measured
+instrumentation overhead. The implementation and hardware audit are recorded in the
+[Stage 4 findings](docs/stage-4-findings.md).
+
+Stage 5 is the current stage. It turns the measured timing evidence into deterministic empirical
+soft real-time contract states and transitions.
 
 ## Local checks
 

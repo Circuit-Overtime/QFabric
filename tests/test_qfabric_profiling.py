@@ -55,6 +55,10 @@ class QFabricProfilingTests(unittest.TestCase):
         self.assertEqual(group["metrics_ns"]["jitter"]["count"], 2)
         self.assertEqual(group["deadline"]["misses"], 1)
         self.assertFalse(group["clock_semantics"]["cross_clock_subtraction"])
+        independent_mean = sum(row["end_to_end_ns"] for row in group["samples"]) / len(
+            group["samples"]
+        )
+        self.assertEqual(group["metrics_ns"]["end_to_end"]["mean"], independent_mean)
 
     def test_cold_start_drops_and_duplicate_ids_are_visible(self) -> None:
         collector = ProfileCollector(capacity=2, warmup=2, minimum_samples=2)
@@ -84,7 +88,7 @@ class QFabricProfilingTests(unittest.TestCase):
             loaded = load_profile(path)
             self.assertEqual(json.loads(path.read_text()), loaded)
             status = render_status(loaded)
-            self.assertIn("add [linux]", status)
+            self.assertIn("add [linux/full]", status)
             self.assertIn("estimator=valid", status)
 
     def test_distribution_matches_independent_reference(self) -> None:

@@ -174,7 +174,7 @@ class ProfileWindow:
             self.dropped += 1
         self.samples.append(sample)
 
-    def report(self, task: str, domain: str) -> dict[str, object]:
+    def report(self, task: str, domain: str, instrumentation: str) -> dict[str, object]:
         successful = [sample for sample in self.samples if sample.outcome == "ok"]
         end_to_end = [
             value for sample in successful if (value := sample.end_to_end_ns) is not None
@@ -205,7 +205,6 @@ class ProfileWindow:
             invalid_reason = "insufficient-samples"
         else:
             invalid_reason = None
-        instrumentation = sorted({sample.instrumentation.value for sample in self.samples})
         return {
             "task": task,
             "domain": domain,
@@ -246,6 +245,7 @@ class ProfileWindow:
                 "mcu_local": "mcu-monotonic-duration",
                 "cross_clock_subtraction": False,
             },
+            "samples": [sample.to_dict() for sample in self.samples],
         }
 
 
@@ -254,14 +254,14 @@ class ProfileCollector:
         self.capacity = capacity
         self.warmup = warmup
         self.minimum_samples = minimum_samples
-        self._windows: dict[tuple[str, str], ProfileWindow] = {}
+        self._windows: dict[tuple[str, str, str], ProfileWindow] = {}
         self._invocation_ids: set[int] = set()
 
     def add(self, sample: ProfileSample) -> None:
         if sample.invocation_id in self._invocation_ids:
             raise ValueError(f"duplicate profile invocation_id: {sample.invocation_id}")
         self._invocation_ids.add(sample.invocation_id)
-        key = (sample.task, sample.domain)
+        key = (sample.task, sample.domain, sample.instrumentation.value)
         window = self._windows.setdefault(
             key,
             ProfileWindow(self.capacity, self.warmup, self.minimum_samples),
@@ -274,7 +274,7 @@ class ProfileCollector:
             "captured_utc": datetime.now(UTC).isoformat(),
             "groups": [
                 self._windows[key].report(*key)
-                for key in sorted(self._windows, key=lambda item: (item[0], item[1]))
+                for key in sorted(self._windows, key=lambda item: (item[0], item[1], item[2]))
             ],
         }
 
@@ -304,7 +304,8 @@ def render_status(report: dict[str, object]) -> str:
         validity = "valid" if window["estimator_valid"] else window["invalid_reason"]
         p95 = "n/a" if latency["p95"] is None else f"{latency['p95'] / 1_000:.3f} us"
         lines.append(
-            f"- {group['task']} [{group['domain']}]: invocations={group['invocation_count']}, "
+            f"- {group['task']} [{group['domain']}/{group['instrumentation']}]: "
+            f"invocations={group['invocation_count']}, "
             f"retained={window['retained_samples']}, p95={p95}, estimator={validity}"
         )
     return "\n".join(lines)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 from .abi import Schema
@@ -12,7 +13,8 @@ from .abi_probe import probe_mcu_abi, write_probe_report
 from .abi_tools import build_golden_vectors, run_compile_fail_cases, write_golden_vectors
 from .audit import audit_stage2, write_audit
 from .build import build_stage2
-from .profiling import load_profile, render_status
+from .profile_runner import run_profile_campaign
+from .profiling import Instrumentation, load_profile, render_status, write_profile
 from .runtime import parse_add_arguments, run_linux, run_rt
 
 
@@ -68,6 +70,23 @@ def build_parser() -> argparse.ArgumentParser:
     status = subparsers.add_parser("status", help="show the latest persisted QTask profile")
     status.add_argument("--input", type=Path, default=Path(".qfabric/profile.json"))
     status.add_argument("--json", action="store_true", dest="as_json")
+
+    profile = subparsers.add_parser("profile", help="run a correlated QTask profile campaign")
+    profile.add_argument("--domain", choices=("linux", "rt", "both"), default="both")
+    profile.add_argument(
+        "--mode", choices=("disabled", "reduced", "full", "all"), default="full"
+    )
+    profile.add_argument("--iterations", type=int, default=100)
+    profile.add_argument("--warmup", type=int, default=10)
+    profile.add_argument("--capacity", type=int, default=1024)
+    profile.add_argument("--minimum-samples", type=int, default=20)
+    profile.add_argument("--deadline-us", type=int, default=20_000)
+    profile.add_argument("--epoch", type=int)
+    profile.add_argument("--timeout", type=float, default=2.0)
+    profile.add_argument("--address", default="unix:///var/run/arduino-router.sock")
+    profile.add_argument("--root", type=Path, default=Path.cwd())
+    profile.add_argument("--output", type=Path, default=Path(".qfabric/profile.json"))
+    profile.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
 
@@ -161,6 +180,39 @@ def main(argv: list[str] | None = None) -> int:
                 print(json.dumps(report, indent=2, sort_keys=True))
             else:
                 print(render_status(report))
+            return 0
+
+        if args.command == "profile":
+            if task_arguments:
+                raise ValueError("qf profile does not accept task arguments")
+            domains = ("linux", "rt") if args.domain == "both" else (args.domain,)
+            modes = (
+                tuple(Instrumentation)
+                if args.mode == "all"
+                else (Instrumentation(args.mode),)
+            )
+            epoch = args.epoch if args.epoch is not None else int(time.time()) & 0xFFFFFFFF
+            report = run_profile_campaign(
+                args.root.resolve(),
+                args.address,
+                domains=domains,
+                modes=modes,
+                iterations=args.iterations,
+                warmup=args.warmup,
+                capacity=args.capacity,
+                minimum_samples=args.minimum_samples,
+                deadline_ns=args.deadline_us * 1_000,
+                epoch=epoch,
+                timeout=args.timeout,
+            )
+            write_profile(report, args.output)
+            rendered = (
+                json.dumps(report, indent=2, sort_keys=True)
+                if args.as_json
+                else render_status(report)
+            )
+            print(rendered)
+            print(f"profile report: {args.output}")
             return 0
 
         if args.task != "add":

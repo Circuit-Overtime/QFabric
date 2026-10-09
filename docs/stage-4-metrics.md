@@ -34,11 +34,60 @@ End-to-end latency, local execution, communication, queueing, and consecutive-la
 the same stable summary: count, minimum, mean, p50, p95, p99, maximum, and population standard
 deviation, all in nanoseconds.
 
+Each group retains its bounded raw sample records in the same JSON report. Independent analysis can
+therefore recompute every aggregate without relying on QFabric's summary implementation.
+
 Instrumentation has three explicit modes:
 
-- `disabled`: execute without collecting timing samples;
+- `disabled`: disable task-internal instrumentation while the outer benchmark records end-to-end
+  cost for overhead comparison;
 - `reduced`: collect correlation and Linux end-to-end timing only; and
 - `full`: also collect available local execution, communication, queueing, and deadline data.
 
 The machine-readable report is canonical JSON. `qf status` will render the same persisted report
 for humans without recomputing its metrics.
+
+## Build and deploy the profiling runtimes
+
+Build the Linux runner and MCU firmware from the workstation:
+
+```bash
+mkdir -p build/stage4/linux build/stage4/rt
+
+aarch64-linux-gnu-g++ \
+  -std=c++20 -O2 -Wall -Wextra -Werror -pedantic \
+  runtime/stage4/linux/qf_profile_linux.cpp \
+  -o build/stage4/linux/qf-profile-linux
+
+arduino-cli compile \
+  --fqbn arduino:zephyr:unoq \
+  --build-path build/stage4/rt \
+  --build-property "compiler.cpp.extra_flags=-I$PWD" \
+  runtime/stage4/rt/qf_stage4_profile
+```
+
+Upload the firmware and copy the Linux artifact as in earlier stages. The Linux runner echoes the
+64-bit invocation ID with its result. The RT runtime stores the epoch, counter, mode, and local
+execution duration; the Linux profiler retrieves and validates those diagnostics only after the
+end-to-end interval has closed.
+
+## Profile and inspect
+
+Run a bounded full-instrumentation smoke campaign on the UNO Q:
+
+```bash
+qf profile \
+  --domain both \
+  --mode full \
+  --iterations 20 \
+  --warmup 5 \
+  --minimum-samples 20 \
+  --output data/processed/stage4/profile-smoke.json
+
+qf status --input data/processed/stage4/profile-smoke.json
+qf status --input data/processed/stage4/profile-smoke.json --json
+```
+
+Use `--mode all` for a disabled/reduced/full overhead comparison. Diagnostic Bridge calls occur
+after the measured RT interval, so reading the MCU-local measurement cannot inflate the recorded
+end-to-end latency.

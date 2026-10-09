@@ -163,7 +163,7 @@ def set_view(
             submitted = bridge.call(
                 "qf_stage9_submit",
                 item.decision_id,
-                health_rgb,
+                mcu_health_rgb,
                 0x0000FF if item.ipc_active else 0,
                 _encode(base),
                 timeout=timeout,

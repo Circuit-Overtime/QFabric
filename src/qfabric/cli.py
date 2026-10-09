@@ -53,6 +53,7 @@ from .recovery import (
     replay_recovery,
     write_recovery_report,
 )
+from .recovery_closed_loop import run_hardware_recovery, write_hardware_recovery
 from .recovery_evidence import (
     derive_recovery_evidence,
     load_json_object,
@@ -185,6 +186,20 @@ def build_parser() -> argparse.ArgumentParser:
     recover_evidence.add_argument("--protected-contracts-unhealthy", action="store_true")
     recover_evidence.add_argument("--transient-misses", type=int, default=0)
     recover_evidence.add_argument("--output", type=Path, required=True)
+    recover_hardware = recover_subparsers.add_parser(
+        "hardware", help="run a bounded closed-loop hardware recovery campaign"
+    )
+    recover_hardware.add_argument("--recommendation-input", type=Path, required=True)
+    recover_hardware.add_argument("--mode", choices=("success", "rollback"), required=True)
+    recover_hardware.add_argument("--task", default="add")
+    recover_hardware.add_argument("--root", type=Path, default=Path.cwd())
+    recover_hardware.add_argument("--address", default="unix:///var/run/arduino-router.sock")
+    recover_hardware.add_argument("--epoch", type=int)
+    recover_hardware.add_argument("--invocations-per-window", type=int, default=20)
+    recover_hardware.add_argument("--deadline-us", type=int, default=20_000)
+    recover_hardware.add_argument("--injected-delay-us", type=int, default=20_000)
+    recover_hardware.add_argument("--timeout", type=float, default=2.0)
+    recover_hardware.add_argument("--output", type=Path, required=True)
 
     contract = subparsers.add_parser(
         "contract", help="evaluate an empirical soft real-time contract"
@@ -452,6 +467,29 @@ def main(argv: list[str] | None = None) -> int:
                 write_recovery_evidence(evidence, args.output)
                 print(f"recovery evidence: {args.output}")
                 return 0
+            if args.recover_command == "hardware":
+                recommendation_input = load_recommendation_input(
+                    args.recommendation_input
+                )
+                epoch = int(time.time()) & 0xFFFFFFFF if args.epoch is None else args.epoch
+                report = run_hardware_recovery(
+                    args.root.resolve(),
+                    args.address,
+                    recommendation_input,
+                    mode=args.mode,
+                    task=args.task,
+                    initial_epoch=epoch,
+                    invocations_per_window=args.invocations_per_window,
+                    deadline_ns=args.deadline_us * 1_000,
+                    injected_delay_ns=args.injected_delay_us * 1_000,
+                    timeout=args.timeout,
+                )
+                write_hardware_recovery(report, args.output)
+                print(f"Stage 7 hardware recovery ({args.mode}): {report['status']}")
+                print(f"hardware report: {args.output}")
+                for failure in report["failures"]:
+                    print(f"- failed check: {failure}", file=sys.stderr)
+                return 0 if report["status"] == "pass" else 1
             policy, initial_domain, initial_epoch, observations = load_recovery_trace(
                 args.input
             )

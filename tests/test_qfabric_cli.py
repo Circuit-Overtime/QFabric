@@ -12,6 +12,50 @@ from qfabric.profiling import Instrumentation, ProfileCollector, ProfileSample, 
 
 
 class QFabricCliTests(unittest.TestCase):
+    def test_bounded_hardware_recovery_command(self) -> None:
+        source = {
+            "schema_version": 1,
+            "policy": {"minimum_evidence": 1, "cooldown_active": False},
+            "mcu": {"utilization_without_task_pct": 0, "reserved_headroom_pct": 0},
+            "tasks": [{"name": "add"}],
+        }
+        report = {
+            "status": "pass",
+            "failures": [],
+            "observed": {"final_domain": "rt"},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            input_path = Path(directory) / "input.json"
+            output_path = Path(directory) / "hardware.json"
+            input_path.write_text(json.dumps(source), encoding="utf-8")
+            stdout = io.StringIO()
+            with (
+                patch(
+                    "qfabric.cli.run_hardware_recovery", return_value=report
+                ) as run,
+                patch("qfabric.cli.write_hardware_recovery") as write,
+                contextlib.redirect_stdout(stdout),
+            ):
+                status = main(
+                    [
+                        "recover",
+                        "hardware",
+                        "--recommendation-input",
+                        str(input_path),
+                        "--mode",
+                        "success",
+                        "--epoch",
+                        "42",
+                        "--output",
+                        str(output_path),
+                    ]
+                )
+            self.assertEqual(status, 0)
+            self.assertIn("hardware recovery (success): pass", stdout.getvalue())
+            self.assertEqual(run.call_args.kwargs["initial_epoch"], 42)
+            self.assertEqual(run.call_args.kwargs["deadline_ns"], 20_000_000)
+            write.assert_called_once_with(report, output_path)
+
     def test_recovery_trace_replay_command(self) -> None:
         trace = {
             "schema_version": 1,

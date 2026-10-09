@@ -132,5 +132,35 @@ interpreted as measuring unrelated firmware or system activity.
 
 The backend supports explicitly labelled per-window delay injection for controlled evaluation.
 Injected delay is included inside the measured end-to-end interval and recorded on every affected
-sample. A live command is not exposed yet: the closed-loop evidence provider and bounded campaign
-must pass locally before hardware actuation is enabled.
+sample.
+
+## Bounded hardware recovery campaigns
+
+The live command is intentionally narrow: it runs exactly nine sequential windows, starts on
+Linux, uses the persisted Stage 6 recommendation input, and supports only the `add` task backend.
+It never rewrites firmware or changes system services. The `success` campaign injects delay into
+Linux for windows 1--3 and then requires three healthy RT probation windows. The `rollback`
+campaign continues injection through window 6, forcing the trial RT placement to fail probation
+and restore Linux before cooldown completes.
+
+Run the success path first:
+
+```bash
+qf recover hardware \
+  --recommendation-input data/processed/stage6/stage6-recommendations-01/recommendation-input.json \
+  --mode success \
+  --task add \
+  --deadline-us 20000 \
+  --injected-delay-us 20000 \
+  --output data/processed/stage7/hardware-success.json
+```
+
+After the success report passes and the Bridge health check succeeds, run the rollback path by
+changing `--mode` to `rollback` and the output name to `hardware-rollback.json`.
+
+Each report contains all 180 invocation outcomes, per-domain contract windows, every dynamic
+recommendation, controller action, placement transition, epoch, and injection label. Passing also
+requires the expected final domain, exact commit/rollback count, safe transition boundaries, and
+one epoch increment per domain change. These are controlled delay-injection experiments, not
+unmodified workload-performance measurements. No protected workload is declared in this bounded
+campaign; the empty protected-contract set must not be presented as evidence about other tasks.

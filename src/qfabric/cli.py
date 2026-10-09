@@ -393,6 +393,7 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate_run.add_argument("--scheduler", type=Path)
     evaluate_run.add_argument("--recovery-success", type=Path, required=True)
     evaluate_run.add_argument("--recovery-rollback", type=Path, required=True)
+    evaluate_run.add_argument("--recommendation-input", type=Path, required=True)
     evaluate_run.add_argument(
         "--recommendation-scenarios", type=Path, required=True
     )
@@ -929,6 +930,7 @@ def main(argv: list[str] | None = None) -> int:
                     scheduler_path=args.scheduler,
                     recovery_success_path=args.recovery_success,
                     recovery_rollback_path=args.recovery_rollback,
+                    recommendation_input_path=args.recommendation_input,
                     recommendation_scenarios_path=args.recommendation_scenarios,
                     stage9_audit_path=args.stage9_audit,
                     stage10_audit_path=args.stage10_audit,

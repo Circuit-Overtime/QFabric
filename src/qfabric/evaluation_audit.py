@@ -146,6 +146,14 @@ def audit_stage11(
     checks["physical_view_uses_prior_audited_trace"] = (
         "visualization_p95_delta_pct" in report["overheads"]
     )
+    checks["overheads_quantified"] = (
+        report["overheads"]["policy"]["cpu_time_ns"]["p95"] > 0
+        and report["overheads"]["policy"]["traced_peak_bytes_single_decision"] > 0
+        and set(report["overheads"]["profiling"]) == {"linux", "rt"}
+        and set(report["overheads"]["communication"]) == {"linux", "rt"}
+        and report["overheads"]["stabilization"]["commit_window"]
+        > report["overheads"]["stabilization"]["switch_window"]
+    )
     checks["scheduler_baseline_disclosure_complete"] = all(
         name in report["scheduler_baselines"]
         for name in ("sched_fifo", "sched_deadline", "preempt_rt")

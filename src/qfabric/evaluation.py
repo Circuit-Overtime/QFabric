@@ -9,11 +9,14 @@ import os
 import platform
 import random
 import statistics
+import time
+import tracemalloc
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from .profiling import percentile
+from .recommendation import recommend
 
 BASELINES = (
     "ordinary-linux",
@@ -278,6 +281,46 @@ def _scheduler_environment(path: Path | None) -> dict[str, Any]:
     return _load(path)
 
 
+def measure_policy_overhead(
+    recommendation_input: dict[str, Any], *, iterations: int = 1000
+) -> dict[str, Any]:
+    if iterations < 100:
+        raise ValueError("policy overhead measurement requires at least 100 iterations")
+    wall_samples = []
+    cpu_samples = []
+    for _index in range(iterations):
+        wall_started = time.perf_counter_ns()
+        cpu_started = time.process_time_ns()
+        report = recommend(recommendation_input)
+        cpu_samples.append(time.process_time_ns() - cpu_started)
+        wall_samples.append(time.perf_counter_ns() - wall_started)
+        if not report["records"]:
+            raise RuntimeError("policy overhead measurement produced no decisions")
+    tracemalloc.start()
+    try:
+        recommend(recommendation_input)
+        _current, peak_bytes = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    return {
+        "measurement": "in-process static recommendation evaluation",
+        "iterations": iterations,
+        "wall_time_ns": {
+            "mean": statistics.fmean(wall_samples),
+            "p95": percentile(wall_samples, 95),
+        },
+        "cpu_time_ns": {
+            "mean": statistics.fmean(cpu_samples),
+            "p95": percentile(cpu_samples, 95),
+        },
+        "traced_peak_bytes_single_decision": peak_bytes,
+        "scope": (
+            "Python allocations observed by tracemalloc; excludes interpreter "
+            "baseline and native allocator memory"
+        ),
+    }
+
+
 def evaluate_stage11(
     root: Path,
     *,
@@ -290,6 +333,7 @@ def evaluate_stage11(
     scheduler_path: Path | None,
     recovery_success_path: Path,
     recovery_rollback_path: Path,
+    recommendation_input_path: Path,
     recommendation_scenarios_path: Path,
     stage9_audit_path: Path,
     stage10_audit_path: Path,
@@ -394,6 +438,8 @@ def evaluate_stage11(
         flagship.append(result)
 
     scenarios = _load(recommendation_scenarios_path)
+    recommendation_input = _load(recommendation_input_path)
+    policy_overhead = measure_policy_overhead(recommendation_input)
     rejection_codes = sorted(
         {
             reason["code"]
@@ -408,6 +454,30 @@ def evaluate_stage11(
     visualization_p95_delta_pct = max(
         float(item["p95_delta_pct"]) for item in stage9["comparisons"]
     )
+    profile_overhead = {}
+    communication = {}
+    for domain in ("linux", "rt"):
+        disabled = next(
+            item
+            for item in stage4["groups"]
+            if item["domain"] == domain and item["instrumentation"] == "disabled"
+        )
+        full = next(
+            item
+            for item in stage4["groups"]
+            if item["domain"] == domain and item["instrumentation"] == "full"
+        )
+        disabled_p95 = float(disabled["metrics_ns"]["end_to_end"]["p95"])
+        full_p95 = float(full["metrics_ns"]["end_to_end"]["p95"])
+        profile_overhead[domain] = {
+            "disabled_p95_ns": disabled_p95,
+            "full_p95_ns": full_p95,
+            "p95_delta_pct": (full_p95 - disabled_p95) / disabled_p95 * 100,
+        }
+        communication[domain] = {
+            "p50_ns": full["metrics_ns"]["communication"]["p50"],
+            "p95_ns": full["metrics_ns"]["communication"]["p95"],
+        }
     manual_path = root / "baselines/manual_bridge_add.cpp"
     qtask_path = root / "qtasks/add.qtask.h"
     effort = {
@@ -463,12 +533,24 @@ def evaluate_stage11(
             "rejection_codes": rejection_codes,
         },
         "RQ4": {
-            "answer": "competitive-in-the-controlled-trace-replay-not-equivalent-to-oracle",
+            "answer": "improves-on-ordinary-linux-but-trails-tuned-linux-and-oracle",
             "recovery_to_oracle_p95_ratio": recovery["p95_ns"] / oracle["p95_ns"],
+            "recovery_to_tuned_linux_p95_ratio": (
+                None
+                if "tuned-linux" not in flagship_rows
+                else recovery["p95_ns"] / flagship_rows["tuned-linux"]["p95_ns"]
+            ),
         },
         "RQ5": {
-            "answer": "bounded-for-measured-profiling-visualization-and-stabilization-costs",
-            "profile_overhead_pct": stage10["overhead"]["p95_delta_pct"],
+            "answer": (
+                "quantified-for-policy-profiling-communication-stabilization-"
+                "and-visualization"
+            ),
+            "policy_cpu_p95_ns": policy_overhead["cpu_time_ns"]["p95"],
+            "policy_peak_traced_bytes": policy_overhead[
+                "traced_peak_bytes_single_decision"
+            ],
+            "profile_overhead_pct": profile_overhead,
             "visualization_overhead_pct": visualization_p95_delta_pct,
         },
         "RQ6": {
@@ -485,6 +567,7 @@ def evaluate_stage11(
         *loaded_linux_paths,
         recovery_success_path,
         recovery_rollback_path,
+        recommendation_input_path,
         recommendation_scenarios_path,
         stage9_audit_path,
         stage10_audit_path,
@@ -541,7 +624,24 @@ def evaluate_stage11(
             "mcu_headroom": "mcu_headroom_exceeded" in rejection_codes,
         },
         "overheads": {
-            "profiling_p95_delta_pct": stage10["overhead"]["p95_delta_pct"],
+            "policy": policy_overhead,
+            "profiling": profile_overhead,
+            "communication": communication,
+            "stabilization": {
+                "switch_window": switch_window,
+                "commit_window": next(
+                    entry["execution"]["window_index"]
+                    for entry in success["runtime"]["windows"]
+                    if any(
+                        action["type"] == "commit"
+                        for action in entry["recovery_step"]["actions"]
+                    )
+                ),
+                "invocations_per_window": window_size,
+            },
+            "optional_kernel_instrumentation_p95_delta_pct": stage10["overhead"][
+                "p95_delta_pct"
+            ],
             "visualization_p95_delta_pct": visualization_p95_delta_pct,
             "kernel_instrumentation_mode": "optional",
             "policy_location": "userspace",

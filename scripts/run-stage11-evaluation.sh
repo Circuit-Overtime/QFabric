@@ -90,6 +90,8 @@ qf evaluate run \
   --scheduler "$root/scheduler.json" \
   --recovery-success data/processed/stage7/hardware-success.json \
   --recovery-rollback data/processed/stage7/hardware-rollback.json \
+  --recommendation-input \
+    data/processed/stage6/stage6-recommendations-01/recommendation-input.json \
   --recommendation-scenarios "$root/recommendation-scenarios.json" \
   --stage9-audit data/processed/stage9/stage9-visualization-01/stage9-audit.json \
   --stage10-audit data/processed/stage10/stage10-kernel-02/stage10-audit.json \

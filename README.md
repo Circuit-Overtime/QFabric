@@ -40,9 +40,15 @@ claim boundary, and independent audit are recorded in the
 [Stage 7 specification](docs/stage-7-recovery.md) and
 [Stage 7 findings](docs/stage-7-findings.md).
 
-Stage 8 is the current stage. It adds faithful explanations, history, and decision inspection for
-the measured recommendation and recovery path tracked in
-[issue #9](https://github.com/Circuit-Overtime/QFabric/issues/9).
+Stage 8 is complete. It provides hash-chained immutable decision history, restart-safe persistence,
+faithful human and JSON explanations, stable identifiers, and exact versioned replay for Stage 6
+recommendations and Stage 7 recovery actions. The schema, evidence, audit, and trust limitations
+are recorded in the [Stage 8 specification](docs/stage-8-decisions.md) and
+[Stage 8 findings](docs/stage-8-findings.md).
+
+Stage 9 is the current stage. It builds the LED matrix and RGB physical observability interface
+tracked in [issue #10](https://github.com/Circuit-Overtime/QFabric/issues/10), driven only by real
+QFabric telemetry and stable decision identifiers.
 
 ## Local checks
 

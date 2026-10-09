@@ -19,7 +19,7 @@ Hardware execution commands additionally require an Arduino UNO Q with the
 matching firmware from this repository. Reproducing the paper therefore uses a
 full repository checkout rather than the Python wheel alone.
 
-Development is organized by the tracking issues in the [GitHub issue tracker](https://github.com/Circuit-Overtime/QFabric/issues). The complete research plan is archived in [issue #13](https://github.com/Circuit-Overtime/QFabric/issues/13).
+Development is organized by the tracking issues in the [GitHub issue tracker](https://github.com/elixpo/qfabric/issues). The complete research plan is archived in [issue #13](https://github.com/elixpo/qfabric/issues/13).
 
 ## Current stage
 

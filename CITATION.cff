@@ -9,10 +9,10 @@ authors:
   - family-names: "Chakraborty"
     given-names: "Anwesha"
     email: "anwesha.elixpo@gmail.com"
-version: 1.0.1
+version: 1.0.2
 date-released: 2026-10-09
-repository-code: "https://github.com/Circuit-Overtime/QFabric"
-url: "https://github.com/Circuit-Overtime/QFabric"
+repository-code: "https://github.com/elixpo/qfabric"
+url: "https://github.com/elixpo/qfabric"
 abstract: >-
   A research prototype and reproducibility artifact for empirical timing-contract
   recovery across Linux and RTOS execution domains on the Arduino UNO Q.
@@ -27,5 +27,5 @@ preferred-citation:
       email: "anwesha.elixpo@gmail.com"
   title: "QFabric: Contract-Driven Cross-Domain Task Recovery"
   year: 2026
-  version: "v1.0.1"
-  repository-code: "https://github.com/Circuit-Overtime/QFabric"
+  version: "v1.0.2"
+  repository-code: "https://github.com/elixpo/qfabric"

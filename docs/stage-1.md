@@ -43,7 +43,7 @@ After the initial QFabric commit has been pushed, enter the UNO Q Linux environm
 
 ```bash
 adb shell
-git clone https://github.com/Circuit-Overtime/QFabric.git
+git clone https://github.com/elixpo/qfabric.git
 cd QFabric
 ```
 

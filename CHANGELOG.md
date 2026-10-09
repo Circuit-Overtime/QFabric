@@ -3,6 +3,18 @@
 All notable changes to QFabric are documented in this file. The project follows
 Semantic Versioning.
 
+## [1.0.2] - 2026-10-09
+
+### Changed
+
+- Migrated the canonical project location from
+  `Circuit-Overtime/QFabric` to `elixpo/qfabric`.
+- Updated package project URLs, citation metadata, documentation links,
+  manuscript references, clone instructions, and release links to the new
+  GitHub organization.
+- Prepared a patch release so package indexes expose the canonical repository
+  rather than retaining the immutable links embedded in earlier distributions.
+
 ## [1.0.1] - 2026-10-09
 
 ### Corrected
@@ -59,6 +71,7 @@ Semantic Versioning.
 - Claims are empirical soft real-time claims, not hard real-time guarantees.
 - Hardware control commands require the matching repository firmware and board.
 
-[1.0.1]: https://github.com/Circuit-Overtime/QFabric/releases/tag/v1.0.1
-[1.0.0]: https://github.com/Circuit-Overtime/QFabric/releases/tag/v1.0.0
-[0.1.0]: https://github.com/Circuit-Overtime/QFabric/releases/tag/v0.1.0
+[1.0.2]: https://github.com/elixpo/qfabric/releases/tag/v1.0.2
+[1.0.1]: https://github.com/elixpo/qfabric/releases/tag/v1.0.1
+[1.0.0]: https://github.com/elixpo/qfabric/releases/tag/v1.0.0
+[0.1.0]: https://github.com/elixpo/qfabric/releases/tag/v0.1.0

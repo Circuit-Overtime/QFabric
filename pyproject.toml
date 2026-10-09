@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qfabric"
-version = "1.0.1"
+version = "1.0.2"
 description = "Contract-driven recovery across Linux and RTOS execution domains"
 readme = "README.md"
 license = "Apache-2.0"
@@ -40,10 +40,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Circuit-Overtime/QFabric"
-Documentation = "https://github.com/Circuit-Overtime/QFabric/tree/main/docs"
-Issues = "https://github.com/Circuit-Overtime/QFabric/issues"
-Repository = "https://github.com/Circuit-Overtime/QFabric"
+Homepage = "https://github.com/elixpo/qfabric"
+Documentation = "https://github.com/elixpo/qfabric/tree/main/docs"
+Issues = "https://github.com/elixpo/qfabric/issues"
+Repository = "https://github.com/elixpo/qfabric"
 
 [project.optional-dependencies]
 dev = [

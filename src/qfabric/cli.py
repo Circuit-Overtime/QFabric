@@ -53,6 +53,11 @@ from .recovery import (
     replay_recovery,
     write_recovery_report,
 )
+from .recovery_evidence import (
+    derive_recovery_evidence,
+    load_json_object,
+    write_recovery_evidence,
+)
 from .recovery_scenarios import run_recovery_scenarios, write_recovery_scenarios
 from .runtime import parse_add_arguments, run_linux, run_rt
 
@@ -169,6 +174,17 @@ def build_parser() -> argparse.ArgumentParser:
         "scenarios", help="run controlled recovery fault-injection scenarios"
     )
     recover_scenarios.add_argument("--output", type=Path, required=True)
+    recover_evidence = recover_subparsers.add_parser(
+        "evidence", help="join Stage 5 and Stage 6 evidence into one recovery observation"
+    )
+    recover_evidence.add_argument("--source-contract", type=Path, required=True)
+    recover_evidence.add_argument("--recommendation", type=Path, required=True)
+    recover_evidence.add_argument("--task", required=True)
+    recover_evidence.add_argument("--safe-boundary", action="store_true")
+    recover_evidence.add_argument("--target-contract", type=Path)
+    recover_evidence.add_argument("--protected-contracts-unhealthy", action="store_true")
+    recover_evidence.add_argument("--transient-misses", type=int, default=0)
+    recover_evidence.add_argument("--output", type=Path, required=True)
 
     contract = subparsers.add_parser(
         "contract", help="evaluate an empirical soft real-time contract"
@@ -414,6 +430,28 @@ def main(argv: list[str] | None = None) -> int:
                 for failure in report["failures"]:
                     print(f"- {failure}", file=sys.stderr)
                 return 0 if report["status"] == "pass" else 1
+            if args.recover_command == "evidence":
+                source_contract = load_json_object(args.source_contract)
+                recommendation = load_json_object(args.recommendation)
+                target_contract = (
+                    None
+                    if args.target_contract is None
+                    else load_json_object(args.target_contract)
+                )
+                evidence = derive_recovery_evidence(
+                    source_contract,
+                    recommendation,
+                    task=args.task,
+                    safe_boundary=args.safe_boundary,
+                    target_contract=target_contract,
+                    protected_contracts_healthy=(
+                        not args.protected_contracts_unhealthy
+                    ),
+                    transient_misses=args.transient_misses,
+                )
+                write_recovery_evidence(evidence, args.output)
+                print(f"recovery evidence: {args.output}")
+                return 0
             policy, initial_domain, initial_epoch, observations = load_recovery_trace(
                 args.input
             )

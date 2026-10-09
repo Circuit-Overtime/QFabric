@@ -85,3 +85,26 @@ epoch increments matching domain changes, deterministic replay, and zero false s
 aggregate report includes detection-delay and verified-recovery samples, transient misses,
 protected-contract regressions, attempts, commits, rollbacks, success and rollback rates, and
 oscillation count.
+
+## Evidence handoff from Stages 5 and 6
+
+Join a persisted Stage 5 source-contract report and Stage 6 recommendation into one validated
+recovery observation with:
+
+```bash
+qf recover evidence \
+  --source-contract data/processed/stage5/stage5-contracts-01/linux-report.json \
+  --recommendation data/processed/stage6/stage6-recommendations-01/recommendations.json \
+  --task add \
+  --safe-boundary \
+  --output data/processed/stage7/recovery-evidence.json
+```
+
+The adapter requires the source state and evidence count to match the recommendation record. It
+preserves the selected alternate and independently derives semantic, admission, and predicted-
+feasibility gates from stable Stage 6 reason codes. Missing evidence, cooldown, or a merely slower
+alternative does not claim exhaustion. A credibly violated source with only permanently rejected
+alternatives may set `alternatives_exhausted`, allowing the controller to report `INFEASIBLE`.
+
+Safe-boundary availability, target probation state, transient misses, and protected-contract
+health are Stage 7 runtime facts and cannot be inferred from the static recommendation.

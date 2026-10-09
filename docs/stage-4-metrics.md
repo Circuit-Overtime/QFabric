@@ -103,3 +103,17 @@ qf profile-analyze \
 The reference path uses Python's independent `statistics` implementation for mean and population
 standard deviation and separately recomputes the ordered percentiles. The documented tolerance is
 0.01% with an absolute floor of 1 ns.
+
+## Completion audit
+
+The Stage 4 gate requires disabled, reduced, and full profiles for both domains plus a separate
+insufficient-sample report. Run it on the UNO Q with:
+
+```bash
+qf profile-audit
+```
+
+The audit permits at most 5% absolute mean instrumentation overhead and 10% absolute p95 overhead
+relative to disabled mode. It also requires exact group coverage, valid estimators, zero failures,
+zero deadline misses, zero drops, independent metric agreement, full-mode component measurements,
+strict clock separation, and explicit insufficient-sample states for both domains.

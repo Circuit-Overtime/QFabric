@@ -14,6 +14,7 @@ from .abi_tools import build_golden_vectors, run_compile_fail_cases, write_golde
 from .audit import audit_stage2, write_audit
 from .build import build_stage2
 from .profile_analysis import analyze_profile, write_profile_analysis
+from .profile_audit import audit_stage4, write_stage4_audit
 from .profile_runner import run_profile_campaign
 from .profiling import Instrumentation, load_profile, render_status, write_profile
 from .runtime import parse_add_arguments, run_linux, run_rt
@@ -95,6 +96,23 @@ def build_parser() -> argparse.ArgumentParser:
     profile_analyze.add_argument("--input", type=Path, required=True)
     profile_analyze.add_argument("--output", type=Path, required=True)
     profile_analyze.add_argument("--tolerance-pct", type=float, default=0.01)
+
+    profile_audit = subparsers.add_parser(
+        "profile-audit", help="validate complete Stage 4 profiling evidence"
+    )
+    profile_audit.add_argument(
+        "--overhead",
+        type=Path,
+        default=Path("data/processed/stage4/profile-overhead.json"),
+    )
+    profile_audit.add_argument(
+        "--cold-start",
+        type=Path,
+        default=Path("data/processed/stage4/profile-cold-start.json"),
+    )
+    profile_audit.add_argument(
+        "--output", type=Path, default=Path("data/processed/stage4/stage4-audit.json")
+    )
     return parser
 
 
@@ -240,6 +258,17 @@ def main(argv: list[str] | None = None) -> int:
             for failure in analysis["failures"]:
                 print(f"- {failure}", file=sys.stderr)
             return 0 if analysis["status"] == "pass" else 1
+
+        if args.command == "profile-audit":
+            if task_arguments:
+                raise ValueError("qf profile-audit does not accept task arguments")
+            report = audit_stage4(args.overhead, args.cold_start)
+            write_stage4_audit(report, args.output)
+            print(f"Stage 4 audit: {report['status']}")
+            print(f"audit report: {args.output}")
+            for failure in report["failures"]:
+                print(f"- {failure}", file=sys.stderr)
+            return 0 if report["status"] == "pass" else 1
 
         if args.task != "add":
             raise ValueError(f"unknown QTask: {args.task}")

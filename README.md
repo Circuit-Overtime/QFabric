@@ -9,9 +9,12 @@ Development is organized by the tracking issues in the [GitHub issue tracker](ht
 Stage 1 is complete. Its 136,800-sample evidence base, findings, recommendations, and documented
 platform limitations are recorded in [the Stage 1 findings](docs/stage-1-findings.md).
 
-Stage 2 proves that one logical QTask can execute through the same CLI on either a real Linux ARM64
+Stage 2 is complete. One logical QTask executes through the same CLI on either a real Linux ARM64
 artifact or the STM32/Zephyr RT domain, with explicit domain selection and no placement policy.
-See [Stage 2 documentation](docs/stage-2.md) for build, deployment, and smoke-test commands.
+The implementation and acceptance evidence are recorded in the
+[Stage 2 findings](docs/stage-2-findings.md).
+
+Stage 3 defines the versioned cross-domain ABI, generated serialization, and effect classes.
 
 ## Local checks
 

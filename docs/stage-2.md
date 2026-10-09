@@ -132,5 +132,8 @@ Retain the following for issue #3:
 - `build/stage2/build-report.json` and the complete `qf build` transcript;
 - the two explicit `qf run` commands and results;
 - the non-interactive smoke-test result; and
-- `data/processed/stage2-audit.json`;
+- `data/processed/stage2-audit.json`; and
 - this architecture note.
+
+The completed result and accepted boundary are summarized in
+[the Stage 2 findings](stage-2-findings.md).

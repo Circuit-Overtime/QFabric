@@ -13,7 +13,14 @@ from .abi_probe import probe_mcu_abi, write_probe_report
 from .abi_tools import build_golden_vectors, run_compile_fail_cases, write_golden_vectors
 from .audit import audit_stage2, write_audit
 from .build import build_stage2
+from .contract_analysis import (
+    analyze_contract_sensitivity,
+    profile_group_to_trace,
+    write_contract_trace,
+    write_sensitivity_report,
+)
 from .contracts import (
+    DeadlineContract,
     load_contract_trace,
     render_contract_status,
     replay_contract,
@@ -24,6 +31,16 @@ from .profile_audit import audit_stage4, write_stage4_audit
 from .profile_runner import run_profile_campaign
 from .profiling import Instrumentation, load_profile, render_status, write_profile
 from .runtime import parse_add_arguments, run_linux, run_rt
+
+
+def _parse_positive_ints(value: str) -> list[int]:
+    try:
+        parsed = [int(item.strip()) for item in value.split(",") if item.strip()]
+    except ValueError as error:
+        raise ValueError("expected a comma-separated list of positive integers") from error
+    if not parsed or any(item < 1 for item in parsed):
+        raise ValueError("expected a comma-separated list of positive integers")
+    return parsed
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -85,6 +102,34 @@ def build_parser() -> argparse.ArgumentParser:
     contract_replay.add_argument("--input", type=Path, required=True)
     contract_replay.add_argument("--output", type=Path, required=True)
     contract_replay.add_argument("--json", action="store_true", dest="as_json")
+    contract_trace = contract_subparsers.add_parser(
+        "trace", help="convert one Stage 4 profile group into a contract trace"
+    )
+    contract_trace.add_argument("--profile", type=Path, required=True)
+    contract_trace.add_argument("--task", default="add")
+    contract_trace.add_argument("--domain", choices=("linux", "rt"), required=True)
+    contract_trace.add_argument(
+        "--mode", choices=("disabled", "reduced", "full"), default="full"
+    )
+    contract_trace.add_argument("--deadline-us", type=int, required=True)
+    contract_trace.add_argument("--window-size", type=int, default=100)
+    contract_trace.add_argument("--minimum-samples", type=int, default=20)
+    contract_trace.add_argument("--warmup-samples", type=int, default=0)
+    contract_trace.add_argument("--max-miss-rate-pct", type=float, default=1.0)
+    contract_trace.add_argument("--at-risk-miss-rate-pct", type=float, default=0.5)
+    contract_trace.add_argument("--recovery-miss-rate-pct", type=float, default=0.25)
+    contract_trace.add_argument("--violation-windows", type=int, default=3)
+    contract_trace.add_argument("--recovery-windows", type=int, default=3)
+    contract_trace.add_argument("--infeasible-windows", type=int, default=5)
+    contract_trace.add_argument("--output", type=Path, required=True)
+    contract_sensitivity = contract_subparsers.add_parser(
+        "sensitivity", help="compare window and hysteresis settings for a trace"
+    )
+    contract_sensitivity.add_argument("--input", type=Path, required=True)
+    contract_sensitivity.add_argument("--window-sizes", default="20,50,100")
+    contract_sensitivity.add_argument("--violation-windows", default="1,2,3")
+    contract_sensitivity.add_argument("--recovery-windows", default="1,2,3")
+    contract_sensitivity.add_argument("--output", type=Path, required=True)
 
     status = subparsers.add_parser("status", help="show the latest persisted QTask profile")
     status.add_argument("--input", type=Path, default=Path(".qfabric/profile.json"))
@@ -218,7 +263,48 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "contract":
             if task_arguments:
                 raise ValueError("qf contract does not accept task arguments")
+            if args.contract_command == "trace":
+                contract = DeadlineContract(
+                    deadline_ns=args.deadline_us * 1_000,
+                    window_size=args.window_size,
+                    minimum_samples=args.minimum_samples,
+                    warmup_samples=args.warmup_samples,
+                    max_miss_rate_pct=args.max_miss_rate_pct,
+                    at_risk_miss_rate_pct=args.at_risk_miss_rate_pct,
+                    recovery_miss_rate_pct=args.recovery_miss_rate_pct,
+                    violation_windows=args.violation_windows,
+                    recovery_windows=args.recovery_windows,
+                    infeasible_windows=args.infeasible_windows,
+                )
+                profile = load_profile(args.profile)
+                trace = profile_group_to_trace(
+                    profile,
+                    contract,
+                    task=args.task,
+                    domain=args.domain,
+                    instrumentation=args.mode,
+                )
+                write_contract_trace(trace, args.output)
+                print(
+                    f"contract trace: {args.output} "
+                    f"({len(trace['observations'])} observations)"
+                )
+                return 0
             contract, observations = load_contract_trace(args.input)
+            if args.contract_command == "sensitivity":
+                report = analyze_contract_sensitivity(
+                    contract,
+                    observations,
+                    window_sizes=_parse_positive_ints(args.window_sizes),
+                    violation_windows=_parse_positive_ints(args.violation_windows),
+                    recovery_windows=_parse_positive_ints(args.recovery_windows),
+                )
+                write_sensitivity_report(report, args.output)
+                print(
+                    f"contract sensitivity: {report['configuration_count']} configurations"
+                )
+                print(f"sensitivity report: {args.output}")
+                return 0
             report = replay_contract(contract, observations)
             write_contract_report(report, args.output)
             rendered = (

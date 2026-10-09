@@ -103,5 +103,47 @@ qf contract replay \
 The report records the `empirical-soft-real-time` claim type and the
 `count-as-deadline-miss` missing-sample policy alongside every transition.
 
+## Convert measured profiles
+
+Convert exactly one task/domain/instrumentation group from a Stage 4 report into a canonical
+contract trace:
+
+```bash
+qf contract trace \
+  --profile data/processed/stage4/profile-overhead.json \
+  --task add \
+  --domain rt \
+  --mode full \
+  --deadline-us 12000 \
+  --window-size 50 \
+  --minimum-samples 20 \
+  --warmup-samples 0 \
+  --output data/raw/stage5/rt-full-trace.json
+```
+
+The converter requires an unambiguous group selection and preserves `ok`, `error`, and `timeout`
+outcomes. A successful sample without an end-to-end duration becomes an explicit `missing`
+observation. Trace provenance states that the source profile's warm-up was already excluded;
+`warmup-samples` is an optional additional Stage 5 exclusion applied to the retained trace.
+
+## Sensitivity analysis
+
+Evaluate a Cartesian product of window sizes and violation/recovery hysteresis settings against
+the exact same observations:
+
+```bash
+qf contract sensitivity \
+  --input data/raw/stage5/rt-full-trace.json \
+  --window-sizes 20,50,100 \
+  --violation-windows 1,2,3 \
+  --recovery-windows 1,2,3 \
+  --output data/processed/stage5/rt-full-sensitivity.json
+```
+
+Every configuration reports its final state, transition count, incomplete trailing observations,
+first entry into each state in both window and absolute-observation units, and the theoretical
+sustained-violation detection bound. Candidate windows smaller than the declared minimum evidence
+are rejected rather than silently changing the contract.
+
 P99 and jitter contracts are intentionally deferred until this deadline/miss-rate contract has
 hardware trace and sensitivity evidence.

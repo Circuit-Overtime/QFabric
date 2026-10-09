@@ -53,6 +53,7 @@ from .recovery import (
     replay_recovery,
     write_recovery_report,
 )
+from .recovery_scenarios import run_recovery_scenarios, write_recovery_scenarios
 from .runtime import parse_add_arguments, run_linux, run_rt
 
 
@@ -164,6 +165,10 @@ def build_parser() -> argparse.ArgumentParser:
     recover_replay.add_argument("--input", type=Path, required=True)
     recover_replay.add_argument("--output", type=Path, required=True)
     recover_replay.add_argument("--json", action="store_true", dest="as_json")
+    recover_scenarios = recover_subparsers.add_parser(
+        "scenarios", help="run controlled recovery fault-injection scenarios"
+    )
+    recover_scenarios.add_argument("--output", type=Path, required=True)
 
     contract = subparsers.add_parser(
         "contract", help="evaluate an empirical soft real-time contract"
@@ -401,6 +406,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "recover":
             if task_arguments:
                 raise ValueError("qf recover does not accept task arguments")
+            if args.recover_command == "scenarios":
+                report = run_recovery_scenarios()
+                write_recovery_scenarios(report, args.output)
+                print(f"Stage 7 recovery scenarios: {report['status']}")
+                print(f"scenario report: {args.output}")
+                for failure in report["failures"]:
+                    print(f"- {failure}", file=sys.stderr)
+                return 0 if report["status"] == "pass" else 1
             policy, initial_domain, initial_epoch, observations = load_recovery_trace(
                 args.input
             )

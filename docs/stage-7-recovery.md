@@ -64,3 +64,24 @@ and oscillations.
 
 This initial replay implementation changes no live placement. Hardware actuation will be added
 only after the protocol invariants and fault-injection traces pass the Stage 7 audit.
+
+## Controlled fault-injection suite
+
+Run the deterministic protocol evaluation with:
+
+```bash
+qf recover scenarios \
+  --output data/processed/stage7/recovery-scenarios.json
+```
+
+The ten scenarios cover noisy or insufficient evidence, successful boundary-delayed recovery,
+semantic and admission rejection, target failure, protected-contract regression with deferred
+rollback, probation timeout, cooldown plus blacklist suppression, cancellation before a boundary,
+and exhausted alternatives. Every injected trace is labelled
+`controlled-fault-injection-not-hardware-performance`.
+
+The suite requires complete recovery-state coverage, safe-boundary flags on every domain change,
+epoch increments matching domain changes, deterministic replay, and zero false switches. Its
+aggregate report includes detection-delay and verified-recovery samples, transient misses,
+protected-contract regressions, attempts, commits, rollbacks, success and rollback rates, and
+oscillation count.

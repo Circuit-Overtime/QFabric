@@ -33,10 +33,16 @@ end-to-end evidence without changing live placement. The policy and audit eviden
 the [Stage 6 specification](docs/stage-6-recommendations.md) and
 [Stage 6 findings](docs/stage-6-findings.md).
 
-Stage 7 is the current stage and the core novelty target: safe closed-loop recovery from credible
-empirical timing-contract violations, including probation, commit, rollback, cooldown, and
-candidate blacklisting. The version 1 protocol is specified in the
-[Stage 7 recovery specification](docs/stage-7-recovery.md).
+Stage 7 is complete. It provides safe closed-loop recovery from credible empirical timing-contract
+violations, including gated actuation, zero-inflight boundaries, epoch-controlled transitions,
+probation, commit, rollback, cooldown, and candidate blacklisting. The protocol, hardware evidence,
+claim boundary, and independent audit are recorded in the
+[Stage 7 specification](docs/stage-7-recovery.md) and
+[Stage 7 findings](docs/stage-7-findings.md).
+
+Stage 8 is the current stage. It adds faithful explanations, history, and decision inspection for
+the measured recommendation and recovery path tracked in
+[issue #9](https://github.com/Circuit-Overtime/QFabric/issues/9).
 
 ## Local checks
 

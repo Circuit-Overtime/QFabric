@@ -4,6 +4,9 @@ Stage 5 evaluates one first-paper contract: whether observed QTask end-to-end la
 a relative deadline and an allowed miss rate. It is an **empirical soft real-time contract**, not
 a formal WCET guarantee.
 
+The completed Arduino UNO Q evidence and limitations are recorded in the
+[Stage 5 findings](stage-5-findings.md).
+
 ## Contract parameters
 
 The version 1 policy fixes all behavior that could otherwise make a result ambiguous:

@@ -23,9 +23,13 @@ measurement semantics, bounded sample windows, independently verified aggregates
 instrumentation overhead. The implementation and hardware audit are recorded in the
 [Stage 4 findings](docs/stage-4-findings.md).
 
-Stage 5 is the current stage. It turns measured timing evidence into deterministic empirical soft
-real-time contract states and transitions. The version 1 semantics are specified in the
-[Stage 5 contract specification](docs/stage-5-contracts.md).
+Stage 5 is complete. It turns measured timing evidence into deterministic empirical soft
+real-time contract states and transitions. The semantics and hardware evidence are recorded in
+the [Stage 5 specification](docs/stage-5-contracts.md) and
+[Stage 5 findings](docs/stage-5-findings.md).
+
+Stage 6 is the current stage. It will build a gated, explainable recommendation engine over the
+measured end-to-end evidence without changing live placement.
 
 ## Local checks
 

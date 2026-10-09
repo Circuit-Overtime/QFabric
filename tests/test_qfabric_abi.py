@@ -66,6 +66,20 @@ class QFabricAbiTests(unittest.TestCase):
                     encoded = self.schema.encode(type_name, value)
                     self.assertEqual(self.schema.decode(type_name, encoded), value)
 
+    def test_float_boundaries_and_signed_zero(self) -> None:
+        cases = {
+            "f32": (-3.4028234663852886e38, 3.4028234663852886e38),
+            "f64": (-1.7976931348623157e308, 1.7976931348623157e308),
+        }
+        for type_name, values in cases.items():
+            for value in values:
+                encoded = self.schema.encode(type_name, value)
+                self.assertEqual(self.schema.decode(type_name, encoded), value)
+            negative_zero = self.schema.encode(type_name, -0.0)
+            positive_zero = self.schema.encode(type_name, 0.0)
+            self.assertNotEqual(negative_zero, positive_zero)
+            self.assertEqual(math.copysign(1, self.schema.decode(type_name, negative_zero)), -1)
+
     def test_rejects_malformed_oversized_and_wrong_version(self) -> None:
         valid = encode_frame(
             Frame(Metadata(MessageType.REQUEST, Effect.PURE, Status.OK, 1, 1, 1), b"")

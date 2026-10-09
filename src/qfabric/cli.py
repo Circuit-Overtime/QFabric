@@ -7,7 +7,7 @@ from pathlib import Path
 from .abi import Schema
 from .abi_codegen import generate_cpp_header, write_cpp_header
 from .abi_probe import probe_mcu_abi, write_probe_report
-from .abi_tools import build_golden_vectors, write_golden_vectors
+from .abi_tools import build_golden_vectors, run_compile_fail_cases, write_golden_vectors
 from .audit import audit_stage2, write_audit
 from .build import build_stage2
 from .runtime import parse_add_arguments, run_linux, run_rt
@@ -37,6 +37,12 @@ def build_parser() -> argparse.ArgumentParser:
     abi_probe.add_argument("--output", type=Path, required=True)
     abi_probe.add_argument("--timeout", type=float, default=2.0)
     abi_probe.add_argument("--address", default="unix:///var/run/arduino-router.sock")
+    abi_compile_fail = abi_subparsers.add_parser(
+        "compile-fail", help="verify rejection of unsupported ABI declarations"
+    )
+    abi_compile_fail.add_argument(
+        "--cases", type=Path, default=Path("tests/abi_compile_fail")
+    )
 
     audit = subparsers.add_parser("audit", help="validate the complete Stage 2 evidence")
     audit.add_argument("--root", type=Path, default=Path.cwd())
@@ -93,6 +99,14 @@ def main(argv: list[str] | None = None) -> int:
                 write_probe_report(report, args.output)
                 print(f"Stage 3 MCU ABI probe: {report['status']}")
                 print(f"probe report: {args.output}")
+                for failure in report["failures"]:
+                    print(f"- {failure}", file=sys.stderr)
+                return 0 if report["status"] == "pass" else 1
+            if args.abi_command == "compile-fail":
+                report = run_compile_fail_cases(args.cases)
+                for case in report["cases"]:
+                    marker = "PASS" if case["rejected"] else "FAIL"
+                    print(f"[{marker}] {case['case']}: {case['diagnostic'] or 'accepted'}")
                 for failure in report["failures"]:
                     print(f"- {failure}", file=sys.stderr)
                 return 0 if report["status"] == "pass" else 1

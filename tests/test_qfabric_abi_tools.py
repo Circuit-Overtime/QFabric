@@ -3,12 +3,22 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from qfabric.abi_tools import build_golden_vectors, write_golden_vectors
+from qfabric.abi_tools import (
+    build_golden_vectors,
+    run_compile_fail_cases,
+    write_golden_vectors,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class QFabricAbiToolsTests(unittest.TestCase):
+    def test_compile_fail_suite_rejects_every_case(self) -> None:
+        result = run_compile_fail_cases(ROOT / "tests/abi_compile_fail")
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(len(result["cases"]), 5)
+        self.assertTrue(all(case["rejected"] for case in result["cases"]))
+
     def test_golden_vectors_are_reproducible(self) -> None:
         schema = ROOT / "config/qfabric-abi.json"
         first = build_golden_vectors(schema)

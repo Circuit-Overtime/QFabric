@@ -39,6 +39,8 @@ class FakeBridge:
             self.replay_index += 1
             self.assert_arguments(arguments, expected[1:3])
             return expected[3]
+        if method == "qf_stage3_scalar_boundaries":
+            return True
         raise AssertionError(method)
 
     @staticmethod

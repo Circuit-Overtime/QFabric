@@ -100,3 +100,24 @@ def build_golden_vectors(schema_path: Path) -> dict[str, object]:
 def write_golden_vectors(vectors: dict[str, object], output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(vectors, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def run_compile_fail_cases(cases: Path) -> dict[str, object]:
+    results: list[dict[str, object]] = []
+    failures: list[str] = []
+    case_paths = sorted(cases.glob("*.json"))
+    if not case_paths:
+        failures.append(f"no compile-fail cases found in {cases}")
+    for path in case_paths:
+        try:
+            Schema.load(path)
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            results.append({"case": path.name, "rejected": True, "diagnostic": str(error)})
+        else:
+            results.append({"case": path.name, "rejected": False, "diagnostic": None})
+            failures.append(f"unsupported declaration was accepted: {path.name}")
+    return {
+        "status": "pass" if not failures else "fail",
+        "cases": results,
+        "failures": failures,
+    }

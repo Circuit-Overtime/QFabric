@@ -4,9 +4,11 @@
 #include <cstdio>
 #include <cstring>
 
-#include "generated/qfabric_abi.hpp"
+#include "runtime/stage3/rt/qf_stage3_abi/qf_stage3_helpers.h"
 
 namespace abi = qfabric::abi;
+
+std::array<std::uint8_t, 128> qf_stage3_buffer{};
 
 namespace {
 
@@ -54,6 +56,7 @@ int main() {
   static_assert(!abi::kTaskAddPinned);
   static_assert(abi::transition_pinned(abi::Q_ACTUATING, false));
   static_assert(!abi::transition_pinned(abi::Q_ACTUATING, true));
+  if (!qf_scalar_boundary_check()) return 8;
 
   abi::ReplayGuard<2> replay_guard;
   if (replay_guard.accept(7, 100) != abi::Status::Ok ||

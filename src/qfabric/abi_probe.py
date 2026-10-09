@@ -36,6 +36,7 @@ def probe_mcu_abi(
     vector_results: list[dict[str, object]] = []
     scenario_results: list[dict[str, object]] = []
     replay_results: list[dict[str, object]] = []
+    scalar_boundaries = False
 
     bridge: Any = _connect_bridge(address)
     try:
@@ -91,6 +92,9 @@ def probe_mcu_abi(
                 failures.append(
                     f"MCU replay status mismatch for {name}: expected {expected}, got {observed}"
                 )
+        scalar_boundaries = bridge.call("qf_stage3_scalar_boundaries", timeout=timeout) is True
+        if not scalar_boundaries:
+            failures.append("MCU scalar boundary round trip failed")
     finally:
         bridge.disconnect()
 
@@ -103,6 +107,7 @@ def probe_mcu_abi(
         "vectors": vector_results,
         "decode_scenarios": scenario_results,
         "replay_scenarios": replay_results,
+        "scalar_boundaries": scalar_boundaries,
         "failures": failures,
     }
 

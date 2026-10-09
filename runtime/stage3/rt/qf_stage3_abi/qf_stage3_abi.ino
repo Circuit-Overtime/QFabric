@@ -82,6 +82,10 @@ std::uint32_t qf_stage3_replay_status(std::uint32_t epoch, std::uint32_t invocat
   return static_cast<std::uint32_t>(qf_stage3_replay_guard.accept(epoch, invocation_id));
 }
 
+bool qf_stage3_scalar_boundaries() {
+  return qf_scalar_boundary_check();
+}
+
 void setup() {
   if (!Bridge.begin()) {
     while (true) delay(1000);
@@ -90,6 +94,7 @@ void setup() {
   Bridge.provide_safe("qf_stage3_decode_status", qf_stage3_decode_status);
   Bridge.provide_safe("qf_stage3_replay_reset", qf_stage3_replay_reset);
   Bridge.provide_safe("qf_stage3_replay_status", qf_stage3_replay_status);
+  Bridge.provide_safe("qf_stage3_scalar_boundaries", qf_stage3_scalar_boundaries);
 }
 
 void loop() {

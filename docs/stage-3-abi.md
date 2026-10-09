@@ -68,6 +68,10 @@ Both the reference implementation and generated C++ codec expose the same replay
 MCU probe resets its bounded window, accepts an invocation, rejects its duplicate, rejects a lower
 epoch, and accepts the same invocation ID again after advancing to a new epoch.
 
+The probe also executes minimum, maximum, and signed-zero round trips for every supported scalar
+width on the MCU. The same helper is compiled and executed by the native and ARM64 golden-vector
+runner.
+
 The canonical machine-readable declarations are in `config/qfabric-abi.json`.
 
 Validate the declarations and regenerate the canonical vectors with:
@@ -76,6 +80,7 @@ Validate the declarations and regenerate the canonical vectors with:
 qf abi check
 qf abi vectors
 qf abi generate
+qf abi compile-fail
 ```
 
 The committed `abi/golden-vectors.json` file is the language-independent source of truth for the
@@ -83,6 +88,8 @@ Linux and MCU codec tests. Implementations must match its payload and complete-f
 must not generate expectations from one target and use those expectations to validate the other.
 The generated `generated/qfabric_abi.hpp` codec uses explicit byte readers and writers rather than
 copying C++ object representations. Both targets compile this same header.
+The compile-fail suite proves that dynamic arrays, pointers, recursive declarations, oversized
+payloads, and unknown effect classes are rejected before target compilation.
 
 After installing the Stage 3 firmware, compare the MCU output with the independent committed
 vectors and exercise its defensive decoder with:

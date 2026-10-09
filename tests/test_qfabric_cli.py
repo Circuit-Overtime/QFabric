@@ -12,6 +12,56 @@ from qfabric.profiling import Instrumentation, ProfileCollector, ProfileSample, 
 
 
 class QFabricCliTests(unittest.TestCase):
+    def test_recommend_and_filtered_recommend_commands(self) -> None:
+        source = {
+            "schema_version": 1,
+            "policy": {"minimum_evidence": 2, "cooldown_active": False},
+            "mcu": {"utilization_without_task_pct": 10, "reserved_headroom_pct": 20},
+            "tasks": [],
+        }
+        for name in ("filter", "control"):
+            source["tasks"].append(
+                {
+                    "name": name,
+                    "effect": "Q_PURE",
+                    "current_domain": "linux",
+                    "rate_hz": 10,
+                    "contract": {"deadline_ns": 1_000, "max_miss_rate_pct": 1},
+                    "chain_edges": [],
+                    "candidates": {
+                        domain: {
+                            "evidence_count": 2,
+                            "end_to_end_p95_ns": 100 if domain == "linux" else 200,
+                            "local_execution_p95_ns": 10,
+                            "observed_miss_rate_pct": 0,
+                            "contract_state": "SATISFIED",
+                            "admission_allowed": True,
+                        }
+                        for domain in ("linux", "rt")
+                    },
+                }
+            )
+        with tempfile.TemporaryDirectory() as directory:
+            input_path = Path(directory) / "input.json"
+            output_path = Path(directory) / "report.json"
+            input_path.write_text(json.dumps(source), encoding="utf-8")
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                status = main(
+                    [
+                        "recommend",
+                        "filter",
+                        "--input",
+                        str(input_path),
+                        "--output",
+                        str(output_path),
+                    ]
+                )
+            self.assertEqual(status, 0)
+            self.assertIn("filter: linux", output.getvalue())
+            report = json.loads(output_path.read_text())
+            self.assertEqual([record["task"] for record in report["records"]], ["filter"])
+
     def test_contract_trace_replay_command(self) -> None:
         contract = DeadlineContract(
             deadline_ns=100,

@@ -29,7 +29,8 @@ the [Stage 5 specification](docs/stage-5-contracts.md) and
 [Stage 5 findings](docs/stage-5-findings.md).
 
 Stage 6 is the current stage. It will build a gated, explainable recommendation engine over the
-measured end-to-end evidence without changing live placement.
+measured end-to-end evidence without changing live placement. The version 1 policy is specified in
+the [Stage 6 recommendation specification](docs/stage-6-recommendations.md).
 
 ## Local checks
 

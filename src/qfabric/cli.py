@@ -34,6 +34,12 @@ from .profile_analysis import analyze_profile, write_profile_analysis
 from .profile_audit import audit_stage4, write_stage4_audit
 from .profile_runner import run_profile_campaign
 from .profiling import Instrumentation, load_profile, render_status, write_profile
+from .recommendation import (
+    load_recommendation_input,
+    recommend,
+    render_recommendation,
+    write_recommendation,
+)
 from .runtime import parse_add_arguments, run_linux, run_rt
 
 
@@ -95,6 +101,16 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--root", type=Path, default=Path.cwd())
     run.add_argument("--timeout", type=float, default=2.0)
     run.add_argument("--address", default="unix:///var/run/arduino-router.sock")
+
+    recommend_command = subparsers.add_parser(
+        "recommend", help="produce advisory static domain recommendations"
+    )
+    recommend_command.add_argument("task", nargs="?")
+    recommend_command.add_argument(
+        "--input", type=Path, default=Path(".qfabric/recommendation-input.json")
+    )
+    recommend_command.add_argument("--output", type=Path)
+    recommend_command.add_argument("--json", action="store_true", dest="as_json")
 
     contract = subparsers.add_parser(
         "contract", help="evaluate an empirical soft real-time contract"
@@ -275,6 +291,22 @@ def main(argv: list[str] | None = None) -> int:
             for failure in result["failures"]:
                 print(f"- {failure}", file=sys.stderr)
             return 0 if result["status"] == "pass" else 1
+
+        if args.command == "recommend":
+            if task_arguments:
+                raise ValueError("qf recommend does not accept task arguments after --")
+            source = load_recommendation_input(args.input)
+            report = recommend(source, task_filter=args.task)
+            if args.output is not None:
+                write_recommendation(report, args.output)
+            print(
+                json.dumps(report, indent=2, sort_keys=True)
+                if args.as_json
+                else render_recommendation(report)
+            )
+            if args.output is not None:
+                print(f"recommendation report: {args.output}")
+            return 0
 
         if args.command == "contract":
             if task_arguments:

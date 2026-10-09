@@ -167,5 +167,34 @@ The generated trace is permanently labelled `injected: true` and
 and detection semantics, not to estimate the physical system's miss rate. The scenario command
 fails unless every phase ends in its expected state and all five states receive coverage.
 
+## Completion campaign
+
+Run the standard evidence campaign on the UNO Q after deploying the Stage 4 profiling firmware
+and Linux runner:
+
+```bash
+bash scripts/run-stage5-contract-campaign.sh stage5-contracts-01
+```
+
+The standard campaign retains 1,000 untouched full-instrumentation observations in each domain,
+with 100 additional warm-up invocations per domain. It uses a 20 ms inclusive deadline,
+100-observation windows, a 1% allowed miss rate, three violating windows, three recovery windows,
+and five 100%-miss windows for empirical infeasibility. Sensitivity covers three window sizes and
+three values for each hysteresis dimension, producing 27 configurations per domain.
+
+The campaign directory contains the source profile, untouched Linux and RT traces, deterministic
+replay reports, sensitivity reports, separately labelled controlled-injection traces, transition
+reports, and `stage5-audit.json`. The final gate can be repeated independently with:
+
+```bash
+qf contract audit \
+  --root data/processed/stage5/stage5-contracts-01 \
+  --output data/processed/stage5/stage5-contracts-01/stage5-audit.json
+```
+
+The audit requires at least 1,000 hardware observations per domain, strict clock semantics,
+byte-equivalent deterministic replays, variation across all three sensitivity dimensions, safe
+injection provenance, passing phase checks, and coverage of every contract state.
+
 P99 and jitter contracts are intentionally deferred until this deadline/miss-rate contract has
 hardware trace and sensitivity evidence.

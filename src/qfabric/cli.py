@@ -22,6 +22,7 @@ from .contract_analysis import (
     write_scenario_report,
     write_sensitivity_report,
 )
+from .contract_audit import audit_stage5, write_stage5_audit
 from .contracts import (
     DeadlineContract,
     load_contract_trace,
@@ -139,6 +140,12 @@ def build_parser() -> argparse.ArgumentParser:
     contract_scenario.add_argument("--input", type=Path, required=True)
     contract_scenario.add_argument("--trace-output", type=Path, required=True)
     contract_scenario.add_argument("--report-output", type=Path, required=True)
+    contract_audit = contract_subparsers.add_parser(
+        "audit", help="validate complete Stage 5 hardware and transition evidence"
+    )
+    contract_audit.add_argument("--root", type=Path, required=True)
+    contract_audit.add_argument("--output", type=Path, required=True)
+    contract_audit.add_argument("--minimum-hardware-observations", type=int, default=1000)
 
     status = subparsers.add_parser("status", help="show the latest persisted QTask profile")
     status.add_argument("--input", type=Path, default=Path(".qfabric/profile.json"))
@@ -272,6 +279,17 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "contract":
             if task_arguments:
                 raise ValueError("qf contract does not accept task arguments")
+            if args.contract_command == "audit":
+                report = audit_stage5(
+                    args.root,
+                    minimum_hardware_observations=args.minimum_hardware_observations,
+                )
+                write_stage5_audit(report, args.output)
+                print(f"Stage 5 audit: {report['status']}")
+                print(f"audit report: {args.output}")
+                for failure in report["failures"]:
+                    print(f"- {failure}", file=sys.stderr)
+                return 0 if report["status"] == "pass" else 1
             if args.contract_command == "trace":
                 contract = DeadlineContract(
                     deadline_ns=args.deadline_us * 1_000,

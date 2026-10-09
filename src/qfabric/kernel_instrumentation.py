@@ -304,6 +304,7 @@ def _controlled_linux_invocation(
     timeout: float,
     use_perf: bool,
     include_kernel: bool,
+    injected_delay_ns: int,
 ) -> tuple[int, dict[str, int] | None]:
     read_fd, write_fd = os.pipe()
     child = os.fork()
@@ -314,6 +315,8 @@ def _controlled_linux_invocation(
             os.dup2(write_fd, 2)
             os.close(write_fd)
             os.kill(os.getpid(), signal.SIGSTOP)
+            if injected_delay_ns:
+                time.sleep(injected_delay_ns / 1_000_000_000)
             os.execv(
                 str(artifact),
                 [str(artifact), str(invocation_id), "0", "2", "3"],
@@ -380,9 +383,12 @@ def run_kernel_benchmark(
     force_fallback: bool = False,
     baseline: bool = False,
     include_kernel: bool = False,
+    injected_delay_ns: int = 0,
 ) -> dict[str, object]:
     if iterations < 1 or warmup < 0:
         raise ValueError("kernel benchmark iterations must be positive and warmup nonnegative")
+    if injected_delay_ns < 0:
+        raise ValueError("kernel benchmark injected delay must not be negative")
     artifact = root / "build/stage4/linux/qf-profile-linux"
     if not artifact.is_file():
         raise ValueError(f"Linux profile artifact is missing: {artifact}")
@@ -414,6 +420,7 @@ def run_kernel_benchmark(
                     timeout=timeout,
                     use_perf=True,
                     include_kernel=include_kernel,
+                    injected_delay_ns=injected_delay_ns,
                 )
             elif baseline:
                 end_to_end_ns, counters = _controlled_linux_invocation(
@@ -422,6 +429,7 @@ def run_kernel_benchmark(
                     timeout=timeout,
                     use_perf=False,
                     include_kernel=False,
+                    injected_delay_ns=injected_delay_ns,
                 )
             else:
                 _linux_invocation(
@@ -477,6 +485,7 @@ def run_kernel_benchmark(
             "warmup": warmup,
             "timeout": timeout,
             "include_kernel": include_kernel,
+            "injected_delay_ns": injected_delay_ns,
         },
         "perf_error": perf_error,
         "policy_location": "userspace",

@@ -340,6 +340,7 @@ def build_parser() -> argparse.ArgumentParser:
     kernel_benchmark.add_argument("--baseline", action="store_true")
     kernel_benchmark.add_argument("--force-fallback", action="store_true")
     kernel_benchmark.add_argument("--include-kernel", action="store_true")
+    kernel_benchmark.add_argument("--injected-delay-ms", type=int, default=0)
     kernel_benchmark.add_argument("--output", type=Path, required=True)
     kernel_audit = kernel_subparsers.add_parser(
         "audit", help="audit Stage 10 necessity, overhead, and safe fallback"
@@ -349,6 +350,7 @@ def build_parser() -> argparse.ArgumentParser:
     kernel_audit.add_argument("--baseline", type=Path, action="append", required=True)
     kernel_audit.add_argument("--perf", type=Path, action="append", required=True)
     kernel_audit.add_argument("--loaded-perf", type=Path, action="append", required=True)
+    kernel_audit.add_argument("--accuracy", type=Path, required=True)
     kernel_audit.add_argument("--fallback", type=Path, required=True)
     kernel_audit.add_argument("--maximum-p95-overhead-pct", type=float, default=15.0)
     kernel_audit.add_argument("--output", type=Path, required=True)
@@ -823,6 +825,7 @@ def main(argv: list[str] | None = None) -> int:
                     force_fallback=args.force_fallback,
                     baseline=args.baseline,
                     include_kernel=args.include_kernel,
+                    injected_delay_ns=args.injected_delay_ms * 1_000_000,
                 )
                 write_json_report(report, args.output)
                 print(f"Stage 10 kernel benchmark ({report['mode']}): {report['status']}")
@@ -834,6 +837,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.baseline,
                 args.perf,
                 args.loaded_perf,
+                args.accuracy,
                 args.fallback,
                 maximum_p95_overhead_pct=args.maximum_p95_overhead_pct,
             )

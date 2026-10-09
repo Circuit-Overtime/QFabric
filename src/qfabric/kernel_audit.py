@@ -27,6 +27,7 @@ def audit_stage10(
     baseline_paths: list[Path],
     perf_paths: list[Path],
     loaded_perf_paths: list[Path],
+    accuracy_path: Path,
     fallback_path: Path,
     *,
     maximum_p95_overhead_pct: float = 15.0,
@@ -38,6 +39,7 @@ def audit_stage10(
     baseline = [_load(path) for path in baseline_paths]
     perf = [_load(path) for path in perf_paths]
     loaded_perf = [_load(path) for path in loaded_perf_paths]
+    accuracy = _load(accuracy_path)
     fallback = _load(fallback_path)
     failures: list[str] = []
 
@@ -62,7 +64,7 @@ def audit_stage10(
         failures.append("custom kernel module boundary was violated")
     policy_userspace = all(
         report.get("policy_location") == "userspace"
-        for report in baseline + perf + loaded_perf + [fallback]
+        for report in baseline + perf + loaded_perf + [accuracy, fallback]
     )
     if not policy_userspace:
         failures.append("one or more reports moved policy outside userspace")
@@ -71,7 +73,7 @@ def audit_stage10(
         report.get("status") == "pass"
         and report.get("failures") == 0
         and report.get("successful_samples") == report["configuration"]["iterations"]
-        for report in baseline + perf + loaded_perf + [fallback]
+        for report in baseline + perf + loaded_perf + [accuracy, fallback]
     )
     if not reports_valid:
         failures.append("one or more kernel instrumentation reports are incomplete")
@@ -81,6 +83,8 @@ def audit_stage10(
         failures.append("instrumented reports did not use perf")
     if not loaded_perf or any(report.get("mode") != "perf" for report in loaded_perf):
         failures.append("CPU-loaded perf reports are missing or invalid")
+    if accuracy.get("mode") != "perf":
+        failures.append("known-delay accuracy report did not use perf")
 
     fallback_safe = (
         fallback.get("mode") == "userspace-fallback"
@@ -118,6 +122,17 @@ def audit_stage10(
     overhead_within_budget = p95_overhead_pct <= maximum_p95_overhead_pct
     if not overhead_within_budget:
         failures.append("perf instrumentation p95 overhead exceeded its budget")
+
+    injected_delay_ns = accuracy["configuration"].get("injected_delay_ns", 0)
+    baseline_non_cpu_p50 = _median_metric(perf, "non_cpu_ns", "p50")
+    accuracy_non_cpu_p50 = float(accuracy["metrics"]["non_cpu_ns"]["p50"])
+    observed_delay_ns = accuracy_non_cpu_p50 - baseline_non_cpu_p50
+    accuracy_error_ns = observed_delay_ns - injected_delay_ns
+    accuracy_within_tolerance = (
+        injected_delay_ns > 0 and abs(accuracy_error_ns) <= 1_000_000
+    )
+    if not accuracy_within_tolerance:
+        failures.append("known-delay non-CPU attribution exceeded 1 ms error")
 
     stage4_group = next(
         (
@@ -163,6 +178,7 @@ def audit_stage10(
             "baseline": [str(path) for path in baseline_paths],
             "perf": [str(path) for path in perf_paths],
             "loaded_perf": [str(path) for path in loaded_perf_paths],
+            "accuracy": str(accuracy_path),
             "fallback": str(fallback_path),
         },
         "measurement_gap": {
@@ -181,6 +197,14 @@ def audit_stage10(
             "p95_delta_pct": p95_overhead_pct,
             "budget_pct": maximum_p95_overhead_pct,
         },
+        "accuracy": {
+            "injected_delay_ns": injected_delay_ns,
+            "baseline_non_cpu_median_p50_ns": baseline_non_cpu_p50,
+            "injected_non_cpu_p50_ns": accuracy_non_cpu_p50,
+            "observed_delay_ns": observed_delay_ns,
+            "error_ns": accuracy_error_ns,
+            "absolute_tolerance_ns": 1_000_000,
+        },
         "checks": {
             "measured_deficiency_addressed": gap_quantified,
             "existing_kernel_interface_selected": selected_perf,
@@ -189,6 +213,7 @@ def audit_stage10(
             "attribution_complete": attribution_complete,
             "scheduler_events_observed_under_load": scheduler_events_observed,
             "overhead_within_budget": overhead_within_budget,
+            "known_delay_accuracy_within_tolerance": accuracy_within_tolerance,
             "userspace_fallback_safe": fallback_safe,
             "policy_remains_userspace": policy_userspace,
             "unavailable_metrics_declared": unavailable_honest,

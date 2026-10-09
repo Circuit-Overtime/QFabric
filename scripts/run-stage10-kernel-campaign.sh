@@ -86,6 +86,13 @@ stress_pid=""
 trap - EXIT
 
 qf kernel benchmark \
+  --include-kernel \
+  --injected-delay-ms 5 \
+  --iterations 200 \
+  --warmup 20 \
+  --output "$root/accuracy-5ms.json"
+
+qf kernel benchmark \
   --force-fallback \
   --iterations 100 \
   --warmup 10 \
@@ -97,6 +104,7 @@ qf kernel audit \
   "${baseline_arguments[@]}" \
   "${perf_arguments[@]}" \
   "${loaded_arguments[@]}" \
+  --accuracy "$root/accuracy-5ms.json" \
   --fallback "$root/fallback.json" \
   --output "$root/stage10-audit.json"
 

@@ -13,14 +13,17 @@ def benchmark(mode: str, *, p95: int, forced: bool = False) -> dict[str, object]
     return {
         "status": "pass",
         "mode": mode,
-        "configuration": {"iterations": 1},
+        "configuration": {"iterations": 1, "injected_delay_ns": 0},
         "perf_error": "forced-unavailable" if forced else None,
         "policy_location": "userspace",
         "successful_samples": 1,
         "failures": 0,
         "metrics": {
             "end_to_end_ns": {"p95": p95},
-            "non_cpu_ns": {"p95": 7_000_000 if perf else None},
+            "non_cpu_ns": {
+                "p50": 7_000_000 if perf else None,
+                "p95": 7_000_000 if perf else None,
+            },
         },
         "samples": [
             {
@@ -98,6 +101,10 @@ class QFabricKernelInstrumentationTests(unittest.TestCase):
                     "userspace-fallback", p95=8_000_000, forced=True
                 ),
             }
+            accuracy = benchmark("perf", p95=13_200_000)
+            accuracy["configuration"]["injected_delay_ns"] = 5_000_000
+            accuracy["metrics"]["non_cpu_ns"]["p50"] = 12_000_000
+            values["accuracy.json"] = accuracy
             paths = {}
             for name, value in values.items():
                 path = root / name
@@ -109,6 +116,7 @@ class QFabricKernelInstrumentationTests(unittest.TestCase):
                 [paths["baseline.json"]],
                 [paths["perf.json"]],
                 [paths["perf.json"]],
+                paths["accuracy.json"],
                 paths["fallback.json"],
             )
         self.assertEqual(report["status"], "pass")

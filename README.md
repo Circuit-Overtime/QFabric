@@ -2,6 +2,23 @@
 
 QFabric investigates safe, closed-loop recovery of empirical timing contracts across Linux and RTOS execution domains on the Arduino UNO Q.
 
+> **Research prototype:** QFabric 0.x is an empirical soft real-time research
+> artifact. It does not provide hard real-time guarantees or a formal
+> schedulability proof.
+
+## Installation
+
+The Python analysis and control CLI requires Python 3.11 or newer:
+
+```bash
+python3 -m pip install qfabric
+qf --help
+```
+
+Hardware execution commands additionally require an Arduino UNO Q with the
+matching firmware from this repository. Reproducing the paper therefore uses a
+full repository checkout rather than the Python wheel alone.
+
 Development is organized by the tracking issues in the [GitHub issue tracker](https://github.com/Circuit-Overtime/QFabric/issues). The complete research plan is archived in [issue #13](https://github.com/Circuit-Overtime/QFabric/issues/13).
 
 ## Current stage
@@ -81,3 +98,9 @@ The hardware-independent tests use only Python's standard library:
 python3 -m unittest discover -s tests -v
 python3 -m compileall -q src tests
 ```
+
+## License and citation
+
+QFabric is licensed under the [Apache License 2.0](LICENSE). Cite the software
+using [CITATION.cff](CITATION.cff); release archives also include the paper and
+audited evidence needed to reproduce the reported claims.

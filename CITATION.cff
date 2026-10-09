@@ -21,5 +21,5 @@ preferred-citation:
       email: "ayushman@myceli.ai"
   title: "QFabric: Contract-Driven Cross-Domain Task Recovery"
   year: 2026
-  version: "commit 719ffe0"
+  version: "v0.1.0"
   repository-code: "https://github.com/Circuit-Overtime/QFabric"

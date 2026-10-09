@@ -1,19 +1,54 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "qfabric-stage1"
+name = "qfabric"
 version = "0.1.0"
-description = "UNO Q hardware and timing characterization harness for QFabric"
+description = "Contract-driven recovery across Linux and RTOS execution domains"
+readme = "README.md"
+license = "Apache-2.0"
+authors = [
+  { name = "Ayushman Bhattacharya", email = "ayushman@myceli.ai" },
+]
 requires-python = ">=3.11"
+keywords = [
+  "embedded-systems",
+  "linux",
+  "rtos",
+  "runtime-verification",
+  "timing-contracts",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Scientific/Engineering",
+  "Topic :: System :: Hardware",
+]
 dependencies = [
   "arduino-router-bridge>=0.5.1",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Circuit-Overtime/QFabric"
+Documentation = "https://github.com/Circuit-Overtime/QFabric/tree/main/docs"
+Issues = "https://github.com/Circuit-Overtime/QFabric/issues"
+Repository = "https://github.com/Circuit-Overtime/QFabric"
+
 [project.optional-dependencies]
 dev = [
+  "build>=1.2",
   "ruff>=0.8",
+  "twine>=5.1",
 ]
 
 [project.scripts]

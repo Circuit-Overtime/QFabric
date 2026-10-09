@@ -26,15 +26,19 @@ if [[ "$EUID" -ne 0 ]]; then
 fi
 
 mkdir -p "$root"
-chrt -f 50 qf evaluate scheduler --output "$root/scheduler.json"
-chrt -f 50 qf profile \
-  --domain linux \
-  --mode full \
-  --iterations "$iterations" \
-  --warmup "$warmup" \
-  --minimum-samples "$iterations" \
-  --deadline-us 20000 \
-  --output "$root/tuned-linux-idle.json"
+if [[ ! -f "$root/scheduler.json" ]]; then
+  chrt -f 50 qf evaluate scheduler --output "$root/scheduler.json"
+fi
+if [[ ! -f "$root/tuned-linux-idle.json" ]]; then
+  chrt -f 50 qf profile \
+    --domain linux \
+    --mode full \
+    --iterations "$iterations" \
+    --warmup "$warmup" \
+    --minimum-samples "$iterations" \
+    --deadline-us 20000 \
+    --output "$root/tuned-linux-idle.json"
+fi
 
 stress_log="$root/stress-ng.log"
 stress_pid=""
@@ -44,28 +48,34 @@ stop_stress() {
     wait "$stress_pid" 2>/dev/null || true
   fi
 }
-trap stop_stress EXIT
-stress-ng \
-  --cpu "$load_workers" \
-  --cpu-method all \
-  --metrics-brief >"$stress_log" 2>&1 &
-stress_pid=$!
-sleep 5
-kill -0 "$stress_pid" 2>/dev/null || {
-  echo "stress-ng stopped before the tuned loaded profile" >&2
-  exit 1
-}
-chrt -f 50 qf profile \
-  --domain linux \
-  --mode full \
-  --iterations "$iterations" \
-  --warmup "$warmup" \
-  --minimum-samples "$iterations" \
-  --deadline-us 20000 \
-  --output "$root/tuned-linux-loaded.json"
-stop_stress
-stress_pid=""
-trap - EXIT
+if [[ ! -f "$root/tuned-linux-loaded.json" ]]; then
+  trap stop_stress EXIT
+  stress-ng \
+    --cpu "$load_workers" \
+    --cpu-method all \
+    --metrics-brief >"$stress_log" 2>&1 &
+  stress_pid=$!
+  sleep 5
+  kill -0 "$stress_pid" 2>/dev/null || {
+    echo "stress-ng stopped before the tuned loaded profile" >&2
+    exit 1
+  }
+  chrt -f 50 qf profile \
+    --domain linux \
+    --mode full \
+    --iterations "$iterations" \
+    --warmup "$warmup" \
+    --minimum-samples "$iterations" \
+    --deadline-us 20000 \
+    --output "$root/tuned-linux-loaded.json"
+  stop_stress
+  stress_pid=""
+  trap - EXIT
+fi
+
+qf recommend-scenarios \
+  --input data/processed/stage6/stage6-recommendations-01/recommendation-input.json \
+  --output "$root/recommendation-scenarios.json"
 
 qf evaluate run \
   --stage1 data/processed/campaigns/idle/initial-idle-04/repetition-01/roundtrip.json \
@@ -80,8 +90,7 @@ qf evaluate run \
   --scheduler "$root/scheduler.json" \
   --recovery-success data/processed/stage7/hardware-success.json \
   --recovery-rollback data/processed/stage7/hardware-rollback.json \
-  --recommendation-scenarios \
-    data/processed/stage6/stage6-recommendations-01/recommendation-scenarios.json \
+  --recommendation-scenarios "$root/recommendation-scenarios.json" \
   --stage9-audit data/processed/stage9/stage9-visualization-01/stage9-audit.json \
   --stage10-audit data/processed/stage10/stage10-kernel-02/stage10-audit.json \
   --observations "$observations" \

@@ -17,6 +17,7 @@ dev = [
 ]
 
 [project.scripts]
+qf = "qfabric.cli:main"
 qf-stage1 = "qfabric_stage1.cli:main"
 
 [tool.setuptools]

@@ -6,18 +6,12 @@ Development is organized by the tracking issues in the [GitHub issue tracker](ht
 
 ## Current stage
 
-Stage 1 characterizes the UNO Q before contract thresholds or placement policy are implemented. It measures:
+Stage 1 is complete. Its 136,800-sample evidence base, findings, recommendations, and documented
+platform limitations are recorded in [the Stage 1 findings](docs/stage-1-findings.md).
 
-- Linux-initiated Linux→MCU→Linux and MCU-initiated MCU→Linux→MCU Bridge latency;
-- payload-size and sequential RPC-rate behavior;
-- cross-domain clock samples without subtracting unsynchronized clocks;
-- MCU execution and queueing diagnostics;
-- LED matrix update overhead; and
-- Linux behavior under controlled load.
-
-See [Stage 1 documentation](docs/stage-1.md) for installation, checks, flashing, execution, and analysis commands.
-The current idle-versus-loaded evidence and open measurement questions are recorded in
-[Stage 1 preliminary findings](docs/stage-1-findings.md).
+Stage 2 proves that one logical QTask can execute through the same CLI on either a real Linux ARM64
+artifact or the STM32/Zephyr RT domain, with explicit domain selection and no placement policy.
+See [Stage 2 documentation](docs/stage-2.md) for build, deployment, and smoke-test commands.
 
 ## Local checks
 

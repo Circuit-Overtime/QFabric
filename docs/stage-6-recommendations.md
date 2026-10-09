@@ -55,6 +55,24 @@ task, projected, reserved, and usable percentages.
 
 ## Interface and deterministic output
 
+Derive the evidence fields from the audited Stage 5 campaign and the canonical ABI declaration:
+
+```bash
+qf recommend-input \
+  --stage5-root data/processed/stage5/stage5-contracts-01 \
+  --abi config/qfabric-abi.json \
+  --operations config/stage6-operations.json \
+  --output data/processed/stage6/recommendation-input.json
+```
+
+The builder imports p95 end-to-end and local execution measurements from the full profiles,
+evidence counts and observed misses from the contract reports, and effect class plus transition
+hooks from the ABI. It rejects mismatched Linux/RT contracts and ambiguous profile groups.
+Admission, current placement, cooldown, managed-task rate, reserved headroom, and supported chain
+edges remain explicit operational inputs; their declared basis is preserved as provenance. The
+committed default describes one managed task and therefore uses zero managed MCU utilization
+without that task. It is not a claim of zero total MCU or firmware utilization.
+
 Evaluate every task in the input:
 
 ```bash
@@ -75,6 +93,23 @@ Each record ID is the SHA-256 of canonical task, policy, and MCU-capacity input.
 timestamp in the decision record, so identical inputs produce byte-equivalent recommendations.
 Every report carries `advisory_only: true`, `placement_changes: 0`, and
 `placement_changed: false` for each task.
+
+## Positive and negative scenario suite
+
+Run the deterministic policy suite from the evidence-derived input:
+
+```bash
+qf recommend-scenarios \
+  --input data/processed/stage6/recommendation-input.json \
+  --output data/processed/stage6/recommendation-scenarios.json
+```
+
+The ten scenarios cover the measured end-to-end choice, a valid positive RT recommendation,
+insufficient evidence, destination rejection, effect ineligibility, Linux-to-RT-to-Linux chain
+cost, cooldown, MCU headroom, a non-satisfied contract, and predicted deadline failure. Each case
+is evaluated twice for byte-equivalent determinism and asserts advisory-only behavior with zero
+placement changes. Scenario mutations are policy validation evidence; only the unmodified base
+case represents the measured hardware input.
 
 ## Version 1 exclusions
 

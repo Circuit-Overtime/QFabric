@@ -40,6 +40,12 @@ from .recommendation import (
     render_recommendation,
     write_recommendation,
 )
+from .recommendation_input import (
+    build_recommendation_input,
+    load_operations,
+    write_recommendation_input,
+)
+from .recommendation_scenarios import run_recommendation_scenarios, write_scenario_suite
 from .runtime import parse_add_arguments, run_linux, run_rt
 
 
@@ -111,6 +117,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     recommend_command.add_argument("--output", type=Path)
     recommend_command.add_argument("--json", action="store_true", dest="as_json")
+
+    recommend_input = subparsers.add_parser(
+        "recommend-input", help="derive recommendation input from Stage 5 evidence"
+    )
+    recommend_input.add_argument("--stage5-root", type=Path, required=True)
+    recommend_input.add_argument(
+        "--abi", type=Path, default=Path("config/qfabric-abi.json")
+    )
+    recommend_input.add_argument(
+        "--operations", type=Path, default=Path("config/stage6-operations.json")
+    )
+    recommend_input.add_argument("--output", type=Path, required=True)
+
+    recommend_scenarios = subparsers.add_parser(
+        "recommend-scenarios", help="run positive and negative recommendation scenarios"
+    )
+    recommend_scenarios.add_argument("--input", type=Path, required=True)
+    recommend_scenarios.add_argument("--output", type=Path, required=True)
 
     contract = subparsers.add_parser(
         "contract", help="evaluate an empirical soft real-time contract"
@@ -307,6 +331,27 @@ def main(argv: list[str] | None = None) -> int:
             if args.output is not None:
                 print(f"recommendation report: {args.output}")
             return 0
+
+        if args.command == "recommend-input":
+            if task_arguments:
+                raise ValueError("qf recommend-input does not accept task arguments")
+            operations = load_operations(args.operations)
+            document = build_recommendation_input(args.stage5_root, args.abi, operations)
+            write_recommendation_input(document, args.output)
+            print(f"recommendation input: {args.output}")
+            return 0
+
+        if args.command == "recommend-scenarios":
+            if task_arguments:
+                raise ValueError("qf recommend-scenarios does not accept task arguments")
+            source = load_recommendation_input(args.input)
+            report = run_recommendation_scenarios(source)
+            write_scenario_suite(report, args.output)
+            print(f"Stage 6 recommendation scenarios: {report['status']}")
+            print(f"scenario report: {args.output}")
+            for failure in report["failures"]:
+                print(f"- {failure}", file=sys.stderr)
+            return 0 if report["status"] == "pass" else 1
 
         if args.command == "contract":
             if task_arguments:

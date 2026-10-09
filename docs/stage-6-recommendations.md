@@ -104,12 +104,30 @@ qf recommend-scenarios \
   --output data/processed/stage6/recommendation-scenarios.json
 ```
 
-The ten scenarios cover the measured end-to-end choice, a valid positive RT recommendation,
+The eleven scenarios cover the measured end-to-end choice, a valid positive RT recommendation,
 insufficient evidence, destination rejection, effect ineligibility, Linux-to-RT-to-Linux chain
-cost, cooldown, MCU headroom, a non-satisfied contract, and predicted deadline failure. Each case
-is evaluated twice for byte-equivalent determinism and asserts advisory-only behavior with zero
-placement changes. Scenario mutations are policy validation evidence; only the unmodified base
-case represents the measured hardware input.
+cost, cooldown, MCU headroom, a non-satisfied contract, excessive observed miss rate, and predicted
+deadline failure. Each case is evaluated twice for byte-equivalent determinism and asserts
+advisory-only behavior with zero placement changes. Scenario mutations are policy validation
+evidence; only the unmodified base case represents the measured hardware input.
+
+## Completion audit
+
+Generate every Stage 6 artifact and run the final reproducibility gate on the workstation:
+
+```bash
+bash scripts/run-stage6-recommendation-audit.sh stage6-recommendations-01
+```
+
+The audit rebuilds the input from Stage 5 and the ABI, recomputes complete and filtered
+recommendations, reruns all scenarios, and requires byte-equivalent deterministic results. It also
+checks the measured faster-MCU/slower-end-to-end decision, positive RT selection, insufficient-
+evidence withholding, all nine rejection reason codes, MCU utilization/headroom reporting, and
+advisory-only behavior with zero placement changes.
+
+The evidence directory is `data/processed/stage6/stage6-recommendations-01`; its canonical result
+is `stage6-audit.json`. No new board campaign is required because Stage 6 consumes the untouched,
+audited Stage 5 hardware measurements and never executes or relocates a task.
 
 ## Version 1 exclusions
 

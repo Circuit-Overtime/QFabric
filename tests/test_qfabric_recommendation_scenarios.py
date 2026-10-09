@@ -8,7 +8,7 @@ class QFabricRecommendationScenarioTests(unittest.TestCase):
     def test_complete_positive_and_negative_suite_passes(self) -> None:
         report = run_recommendation_scenarios(recommendation_input())
         self.assertEqual(report["status"], "pass")
-        self.assertEqual(report["scenario_count"], 10)
+        self.assertEqual(report["scenario_count"], 11)
         self.assertEqual(report["failures"], [])
         names = {scenario["name"] for scenario in report["scenarios"]}
         self.assertEqual(
@@ -23,6 +23,7 @@ class QFabricRecommendationScenarioTests(unittest.TestCase):
                 "cooldown",
                 "mcu-headroom",
                 "contract-at-risk",
+                "observed-miss-rate",
                 "predicted-deadline-miss",
             },
         )

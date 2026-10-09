@@ -78,11 +78,23 @@ def run_recommendation_scenarios(base: dict[str, Any]) -> dict[str, Any]:
 
     chain = scenario("chain-ping-pong")
     chain_task = chain["tasks"][0]
-    chain_task["candidates"]["linux"]["end_to_end_p95_ns"] = 9_000_000
-    chain_task["candidates"]["rt"]["end_to_end_p95_ns"] = 8_000_000
+    chain_deadline = chain_task["contract"]["deadline_ns"]
+    chain_task["candidates"]["linux"]["end_to_end_p95_ns"] = int(
+        chain_deadline * 0.45
+    )
+    chain_task["candidates"]["rt"]["end_to_end_p95_ns"] = int(chain_deadline * 0.40)
+    boundary_cost = int(chain_deadline * 0.05)
     chain_task["chain_edges"] = [
-        {"neighbor": "decode", "neighbor_domain": "linux", "boundary_cost_ns": 1_000_000},
-        {"neighbor": "encode", "neighbor_domain": "linux", "boundary_cost_ns": 1_000_000},
+        {
+            "neighbor": "decode",
+            "neighbor_domain": "linux",
+            "boundary_cost_ns": boundary_cost,
+        },
+        {
+            "neighbor": "encode",
+            "neighbor_domain": "linux",
+            "boundary_cost_ns": boundary_cost,
+        },
     ]
     definitions[-1] = (
         "chain-ping-pong",
@@ -115,6 +127,18 @@ def run_recommendation_scenarios(base: dict[str, Any]) -> dict[str, Any]:
         contract,
         "linux",
         "contract_not_satisfied",
+    )
+
+    miss_rate = scenario("observed-miss-rate")
+    miss_rate["tasks"][0]["candidates"]["rt"]["end_to_end_p95_ns"] = faster_rt_p95
+    miss_rate["tasks"][0]["candidates"]["rt"]["observed_miss_rate_pct"] = (
+        miss_rate["tasks"][0]["contract"]["max_miss_rate_pct"] + 0.1
+    )
+    definitions[-1] = (
+        "observed-miss-rate",
+        miss_rate,
+        "linux",
+        "observed_miss_rate_exceeds_contract",
     )
 
     deadline = scenario("predicted-deadline-miss")

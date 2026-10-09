@@ -40,6 +40,7 @@ from .recommendation import (
     render_recommendation,
     write_recommendation,
 )
+from .recommendation_audit import audit_stage6, write_stage6_audit
 from .recommendation_input import (
     build_recommendation_input,
     load_operations,
@@ -135,6 +136,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     recommend_scenarios.add_argument("--input", type=Path, required=True)
     recommend_scenarios.add_argument("--output", type=Path, required=True)
+
+    recommend_audit = subparsers.add_parser(
+        "recommend-audit", help="validate complete Stage 6 recommendation evidence"
+    )
+    recommend_audit.add_argument("--root", type=Path, required=True)
+    recommend_audit.add_argument("--stage5-root", type=Path, required=True)
+    recommend_audit.add_argument(
+        "--abi", type=Path, default=Path("config/qfabric-abi.json")
+    )
+    recommend_audit.add_argument(
+        "--operations", type=Path, default=Path("config/stage6-operations.json")
+    )
+    recommend_audit.add_argument("--output", type=Path, required=True)
 
     contract = subparsers.add_parser(
         "contract", help="evaluate an empirical soft real-time contract"
@@ -349,6 +363,22 @@ def main(argv: list[str] | None = None) -> int:
             write_scenario_suite(report, args.output)
             print(f"Stage 6 recommendation scenarios: {report['status']}")
             print(f"scenario report: {args.output}")
+            for failure in report["failures"]:
+                print(f"- {failure}", file=sys.stderr)
+            return 0 if report["status"] == "pass" else 1
+
+        if args.command == "recommend-audit":
+            if task_arguments:
+                raise ValueError("qf recommend-audit does not accept task arguments")
+            report = audit_stage6(
+                args.root,
+                args.stage5_root,
+                args.abi,
+                args.operations,
+            )
+            write_stage6_audit(report, args.output)
+            print(f"Stage 6 audit: {report['status']}")
+            print(f"audit report: {args.output}")
             for failure in report["failures"]:
                 print(f"- {failure}", file=sys.stderr)
             return 0 if report["status"] == "pass" else 1

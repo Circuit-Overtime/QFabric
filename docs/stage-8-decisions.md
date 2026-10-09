@@ -34,3 +34,51 @@ truncated tail is rejected rather than silently discarded.
 The journal contains policy evidence and may grow without bound. Rotation, retention, access
 control, redaction, and multi-host replication are outside the version 1 scope and must be defined
 before recording sensitive or long-running deployments.
+
+## Recording decisions
+
+Record one Stage 6 recommendation from its complete policy input:
+
+```bash
+qf history recommendation \
+  --input data/processed/stage6/stage6-recommendations-01/recommendation-input.json \
+  --task add \
+  --store data/processed/stage8/decisions.jsonl
+```
+
+Import every controller step from an independently replayable Stage 7 hardware report:
+
+```bash
+qf history recovery \
+  --input data/processed/stage7/hardware-success.json \
+  --recommendation-input \
+  data/processed/stage6/stage6-recommendations-01/recommendation-input.json \
+  --store data/processed/stage8/decisions.jsonl
+```
+
+The importer replays the complete recovery report before appending anything. Each persisted
+recovery decision contains the policy, initial placement and epoch, and observation prefix needed
+to reproduce that exact controller step. Structured facts also preserve its contract definition,
+sample window and confidence interval, candidate costs, communication and chain costs, semantic
+and admission gates, MCU headroom, cooldown and blacklist values, rollback reason, and post-switch
+probation result.
+
+## Explain and replay
+
+The required interfaces read only validated immutable records:
+
+```bash
+qf explain add --history data/processed/stage8/decisions.jsonl
+qf explain add --decision 1 --history data/processed/stage8/decisions.jsonl
+qf replay --decision 1 --history data/processed/stage8/decisions.jsonl
+```
+
+Add `--json` to `explain` or `replay` for machine-readable output. The human explanation is
+generated from the same structured explanation document and renders every input, outcome, and
+fact as a deterministic field path; it does not maintain a separate prose interpretation that
+could drift from the JSON view.
+
+Replay invokes the recorded policy version over the stored inputs and requires exact structural
+equality with the recorded outcome. Recommendation replay covers the complete filtered Stage 6
+report. Recovery replay covers the policy state after every stored observation prefix, including
+the exact action, domain, epoch, probation, rollback, cooldown, and blacklist state.

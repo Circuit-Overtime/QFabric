@@ -30,6 +30,13 @@ from .contracts import (
     replay_contract,
     write_contract_report,
 )
+from .decision_history import DecisionStore
+from .decision_records import (
+    record_hardware_recovery,
+    record_recommendation,
+    replay_decision,
+)
+from .explanations import explain_decision, render_explanation, render_replay
 from .profile_analysis import analyze_profile, write_profile_analysis
 from .profile_audit import audit_stage4, write_stage4_audit
 from .profile_runner import run_profile_campaign
@@ -207,6 +214,46 @@ def build_parser() -> argparse.ArgumentParser:
     recover_audit.add_argument("--root", type=Path, required=True)
     recover_audit.add_argument("--recommendation-input", type=Path, required=True)
     recover_audit.add_argument("--output", type=Path, required=True)
+
+    history = subparsers.add_parser(
+        "history", help="persist immutable recommendation and recovery decisions"
+    )
+    history_subparsers = history.add_subparsers(dest="history_command", required=True)
+    history_recommendation = history_subparsers.add_parser(
+        "recommendation", help="record one Stage 6 recommendation"
+    )
+    history_recommendation.add_argument("--input", type=Path, required=True)
+    history_recommendation.add_argument("--task", required=True)
+    history_recommendation.add_argument(
+        "--store", type=Path, default=Path(".qfabric/decisions.jsonl")
+    )
+    history_recovery = history_subparsers.add_parser(
+        "recovery", help="record every decision in one Stage 7 hardware report"
+    )
+    history_recovery.add_argument("--input", type=Path, required=True)
+    history_recovery.add_argument("--recommendation-input", type=Path, required=True)
+    history_recovery.add_argument(
+        "--store", type=Path, default=Path(".qfabric/decisions.jsonl")
+    )
+
+    explain = subparsers.add_parser(
+        "explain", help="explain an immutable persisted policy decision"
+    )
+    explain.add_argument("task")
+    explain.add_argument("--decision", type=int)
+    explain.add_argument(
+        "--history", type=Path, default=Path(".qfabric/decisions.jsonl")
+    )
+    explain.add_argument("--json", action="store_true", dest="as_json")
+
+    replay = subparsers.add_parser(
+        "replay", help="recompute one immutable persisted policy decision"
+    )
+    replay.add_argument("--decision", type=int, required=True)
+    replay.add_argument(
+        "--history", type=Path, default=Path(".qfabric/decisions.jsonl")
+    )
+    replay.add_argument("--json", action="store_true", dest="as_json")
 
     contract = subparsers.add_parser(
         "contract", help="evaluate an empirical soft real-time contract"
@@ -522,6 +569,60 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(f"recovery report: {args.output}")
             return 0
+
+        if args.command == "history":
+            if task_arguments:
+                raise ValueError("qf history does not accept task arguments")
+            store = DecisionStore(args.store)
+            if args.history_command == "recommendation":
+                source = load_recommendation_input(args.input)
+                record = record_recommendation(store, source, task=args.task)
+                print(
+                    f"recorded recommendation decision {record['decision_id']}: "
+                    f"{record['record_sha256']}"
+                )
+                return 0
+            hardware = load_json_object(args.input)
+            source = load_recommendation_input(args.recommendation_input)
+            records = record_hardware_recovery(store, hardware, source)
+            print(
+                f"recorded {len(records)} recovery decisions: "
+                f"{records[0]['decision_id']}..{records[-1]['decision_id']}"
+            )
+            return 0
+
+        if args.command == "explain":
+            if task_arguments:
+                raise ValueError("qf explain does not accept task arguments")
+            store = DecisionStore(args.history)
+            record = (
+                store.latest(args.task)
+                if args.decision is None
+                else store.get(args.decision)
+            )
+            if record["task"] != args.task:
+                raise ValueError(
+                    f"decision {record['decision_id']} belongs to task {record['task']}"
+                )
+            explanation = explain_decision(record)
+            print(
+                json.dumps(explanation, indent=2, sort_keys=True)
+                if args.as_json
+                else render_explanation(explanation)
+            )
+            return 0
+
+        if args.command == "replay":
+            if task_arguments:
+                raise ValueError("qf replay does not accept task arguments")
+            record = DecisionStore(args.history).get(args.decision)
+            report = replay_decision(record)
+            print(
+                json.dumps(report, indent=2, sort_keys=True)
+                if args.as_json
+                else render_replay(report)
+            )
+            return 0 if report["matches"] else 1
 
         if args.command == "contract":
             if task_arguments:

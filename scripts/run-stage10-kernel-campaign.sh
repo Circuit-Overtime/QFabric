@@ -21,6 +21,10 @@ test -f "$stage4_profile" || {
   echo "Stage 4 reference profile is missing: $stage4_profile" >&2
   exit 1
 }
+if [[ "$EUID" -ne 0 ]]; then
+  echo "run the Stage 10 campaign as root to collect kernel scheduler events" >&2
+  exit 1
+fi
 
 mkdir -p "$root"
 qf kernel capabilities --output "$root/capabilities.json"
@@ -33,11 +37,13 @@ for repetition in $(seq 1 "$repetitions"); do
   baseline="$root/baseline-${label}.json"
   perf="$root/perf-${label}.json"
   qf kernel benchmark \
+    --include-kernel \
     --baseline \
     --iterations "$iterations" \
     --warmup "$warmup" \
     --output "$baseline"
   qf kernel benchmark \
+    --include-kernel \
     --iterations "$iterations" \
     --warmup "$warmup" \
     --output "$perf"
@@ -69,6 +75,7 @@ for repetition in $(seq 1 "$repetitions"); do
   label=$(printf "%02d" "$repetition")
   loaded="$root/perf-loaded-${label}.json"
   qf kernel benchmark \
+    --include-kernel \
     --iterations "$iterations" \
     --warmup "$warmup" \
     --output "$loaded"

@@ -77,13 +77,14 @@ def _open_perf_event(
     group_fd: int = -1,
     pid: int = 0,
     inherit: bool = True,
+    include_kernel: bool = False,
 ) -> int:
     attributes = PerfEventAttr()
     attributes.type = PERF_TYPE_SOFTWARE
     attributes.size = ctypes.sizeof(PerfEventAttr)
     attributes.config = config
-    # disabled, inherit into the QTask child, exclude kernel, exclude hypervisor
-    attributes.flags = (1 << 0) | (int(inherit) << 1) | (1 << 5) | (1 << 6)
+    # disabled, optional inheritance, and no hypervisor measurements
+    attributes.flags = (1 << 0) | (int(inherit) << 1) | (int(not include_kernel) << 5) | (1 << 6)
     libc = ctypes.CDLL(None, use_errno=True)
     result = libc.syscall(
         _syscall_number(),
@@ -104,7 +105,13 @@ class PerfCounterGroup:
     descriptors: dict[str, int]
 
     @classmethod
-    def open(cls, *, pid: int = 0, inherit: bool = True) -> PerfCounterGroup:
+    def open(
+        cls,
+        *,
+        pid: int = 0,
+        inherit: bool = True,
+        include_kernel: bool = False,
+    ) -> PerfCounterGroup:
         descriptors: dict[str, int] = {}
         try:
             for name, config in PERF_EVENTS.items():
@@ -114,6 +121,7 @@ class PerfCounterGroup:
                     group_fd=group_fd,
                     pid=pid,
                     inherit=inherit,
+                    include_kernel=include_kernel,
                 )
             return cls(descriptors)
         except OSError:
@@ -171,6 +179,7 @@ def probe_kernel_capabilities() -> dict[str, object]:
     schedstat = _read_text(Path("/proc/self/schedstat"))
     schedstat_fields = [] if schedstat is None else schedstat.split()
     perf_events: dict[str, dict[str, object]] = {}
+    kernel_inclusive_events: dict[str, dict[str, object]] = {}
     for name, event in PERF_EVENTS.items():
         try:
             descriptor = _open_perf_event(event)
@@ -183,6 +192,21 @@ def probe_kernel_capabilities() -> dict[str, object]:
         else:
             os.close(descriptor)
             perf_events[name] = {"available": True, "errno": None, "error": None}
+        try:
+            descriptor = _open_perf_event(event, include_kernel=True)
+        except OSError as error:
+            kernel_inclusive_events[name] = {
+                "available": False,
+                "errno": error.errno,
+                "error": error.strerror,
+            }
+        else:
+            os.close(descriptor)
+            kernel_inclusive_events[name] = {
+                "available": True,
+                "errno": None,
+                "error": None,
+            }
 
     trace_root = Path("/sys/kernel/tracing")
     debug_trace_root = Path("/sys/kernel/debug/tracing")
@@ -212,6 +236,7 @@ def probe_kernel_capabilities() -> dict[str, object]:
         },
         "interfaces": {
             "perf_software_events": perf_events,
+            "kernel_inclusive_perf_events": kernel_inclusive_events,
             "psi_cpu": _is_file(Path("/proc/pressure/cpu")),
             "process_schedstat": {
                 "available": schedstat is not None,
@@ -229,6 +254,11 @@ def probe_kernel_capabilities() -> dict[str, object]:
                 "perf_event_open-software-counters" if perf_available else "userspace-only"
             ),
             "perf_available": perf_available,
+            "kernel_inclusive_scheduler_events": all(
+                kernel_inclusive_events[name]["available"]
+                for name in ("context_switches", "cpu_migrations")
+            ),
+            "scheduler_event_privilege": "root-or-CAP_PERFMON",
             "wake_up_latency": "unavailable-with-stock-kernel",
             "cpu_pressure": "unavailable-CONFIG_PSI-disabled",
             "ebpf": "not-justified-no-scheduler-tracepoints-or-BTF",
@@ -273,6 +303,7 @@ def _controlled_linux_invocation(
     *,
     timeout: float,
     use_perf: bool,
+    include_kernel: bool,
 ) -> tuple[int, dict[str, int] | None]:
     read_fd, write_fd = os.pipe()
     child = os.fork()
@@ -300,7 +331,11 @@ def _controlled_linux_invocation(
             raise RuntimeError("QTask child did not enter its controlled start boundary")
         pid_fd = os.pidfd_open(child)
         if use_perf:
-            counter_group = PerfCounterGroup.open(pid=child, inherit=False)
+            counter_group = PerfCounterGroup.open(
+                pid=child,
+                inherit=False,
+                include_kernel=include_kernel,
+            )
             counter_group.start()
         started = time.perf_counter_ns()
         os.kill(child, signal.SIGCONT)
@@ -344,6 +379,7 @@ def run_kernel_benchmark(
     timeout: float,
     force_fallback: bool = False,
     baseline: bool = False,
+    include_kernel: bool = False,
 ) -> dict[str, object]:
     if iterations < 1 or warmup < 0:
         raise ValueError("kernel benchmark iterations must be positive and warmup nonnegative")
@@ -357,7 +393,7 @@ def run_kernel_benchmark(
     perf_error: str | None = "forced-unavailable" if force_fallback else None
     if not force_fallback and not baseline:
         try:
-            probe = PerfCounterGroup.open()
+            probe = PerfCounterGroup.open(include_kernel=include_kernel)
         except OSError as error:
             perf_error = f"[{error.errno}] {error.strerror}"
         else:
@@ -377,6 +413,7 @@ def run_kernel_benchmark(
                     invocation_id,
                     timeout=timeout,
                     use_perf=True,
+                    include_kernel=include_kernel,
                 )
             elif baseline:
                 end_to_end_ns, counters = _controlled_linux_invocation(
@@ -384,6 +421,7 @@ def run_kernel_benchmark(
                     invocation_id,
                     timeout=timeout,
                     use_perf=False,
+                    include_kernel=False,
                 )
             else:
                 _linux_invocation(
@@ -438,6 +476,7 @@ def run_kernel_benchmark(
             "iterations": iterations,
             "warmup": warmup,
             "timeout": timeout,
+            "include_kernel": include_kernel,
         },
         "perf_error": perf_error,
         "policy_location": "userspace",

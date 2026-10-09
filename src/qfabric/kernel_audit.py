@@ -48,6 +48,13 @@ def audit_stage10(
     )
     if not selected_perf:
         failures.append("standard perf software counters were not selected and available")
+    privileged_scheduler_events = (
+        capabilities.get("selection", {}).get("kernel_inclusive_scheduler_events") is True
+        and capabilities.get("selection", {}).get("scheduler_event_privilege")
+        == "root-or-CAP_PERFMON"
+    )
+    if not privileged_scheduler_events:
+        failures.append("kernel scheduler-event privilege was not available and declared")
     no_custom_module = (
         capabilities.get("selection", {}).get("custom_kernel_module") == "not-introduced"
     )
@@ -177,6 +184,7 @@ def audit_stage10(
         "checks": {
             "measured_deficiency_addressed": gap_quantified,
             "existing_kernel_interface_selected": selected_perf,
+            "scheduler_event_privilege_declared": privileged_scheduler_events,
             "before_after_reports_valid": reports_valid,
             "attribution_complete": attribution_complete,
             "scheduler_events_observed_under_load": scheduler_events_observed,

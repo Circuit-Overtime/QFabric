@@ -339,6 +339,7 @@ def build_parser() -> argparse.ArgumentParser:
     kernel_benchmark.add_argument("--timeout", type=float, default=2.0)
     kernel_benchmark.add_argument("--baseline", action="store_true")
     kernel_benchmark.add_argument("--force-fallback", action="store_true")
+    kernel_benchmark.add_argument("--include-kernel", action="store_true")
     kernel_benchmark.add_argument("--output", type=Path, required=True)
     kernel_audit = kernel_subparsers.add_parser(
         "audit", help="audit Stage 10 necessity, overhead, and safe fallback"
@@ -821,6 +822,7 @@ def main(argv: list[str] | None = None) -> int:
                     timeout=args.timeout,
                     force_fallback=args.force_fallback,
                     baseline=args.baseline,
+                    include_kernel=args.include_kernel,
                 )
                 write_json_report(report, args.output)
                 print(f"Stage 10 kernel benchmark ({report['mode']}): {report['status']}")

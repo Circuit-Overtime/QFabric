@@ -69,6 +69,8 @@ class QFabricKernelInstrumentationTests(unittest.TestCase):
             "selection": {
                 "mechanism": "perf_event_open-software-counters",
                 "perf_available": True,
+                "kernel_inclusive_scheduler_events": True,
+                "scheduler_event_privilege": "root-or-CAP_PERFMON",
                 "wake_up_latency": "unavailable-with-stock-kernel",
                 "cpu_pressure": "unavailable-CONFIG_PSI-disabled",
                 "ebpf": "not-justified-no-scheduler-tracepoints-or-BTF",

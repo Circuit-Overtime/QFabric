@@ -108,3 +108,29 @@ alternatives may set `alternatives_exhausted`, allowing the controller to report
 
 Safe-boundary availability, target probation state, transient misses, and protected-contract
 health are Stage 7 runtime facts and cannot be inferred from the static recommendation.
+
+## Hardware-safe execution boundary
+
+The recovery executor runs bounded, sequential invocation windows through the real AArch64 Linux
+artifact or STM32 Bridge method. A window is a safe boundary only when its in-flight count is zero.
+The executor rejects any recovery observation that disagrees with that measured condition.
+
+Controller state and backend placement/epoch are checked before and after every window. A
+controller `switch` or `rollback` action is the only path to the backend transition method; the
+executor additionally requires the action and measured window to both declare a safe boundary.
+The backend then requires the alternate domain and exactly `epoch + 1`, resets its invocation
+counter for that epoch, and refuses to transition with an in-flight call.
+
+Probation windows execute on the trial domain, so their actual outcomes can feed target-contract
+evaluation. Rollback restores the origin at the next safe boundary, and the following window
+executes in the restored domain and new epoch. Runtime reports preserve every execution sample,
+recovery step, and applied placement transition.
+
+Protected contracts cannot be declared without a health probe. When no protected workload is
+declared, the report may state that the empty protected set remained healthy; this must not be
+interpreted as measuring unrelated firmware or system activity.
+
+The backend supports explicitly labelled per-window delay injection for controlled evaluation.
+Injected delay is included inside the measured end-to-end interval and recorded on every affected
+sample. A live command is not exposed yet: the closed-loop evidence provider and bounded campaign
+must pass locally before hardware actuation is enabled.

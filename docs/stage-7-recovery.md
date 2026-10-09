@@ -164,3 +164,22 @@ requires the expected final domain, exact commit/rollback count, safe transition
 one epoch increment per domain change. These are controlled delay-injection experiments, not
 unmodified workload-performance measurements. No protected workload is declared in this bounded
 campaign; the empty protected-contract set must not be presented as evidence about other tasks.
+
+## Final evidence audit
+
+After copying both hardware reports beside `recovery-scenarios.json`, run:
+
+```bash
+qf recover audit \
+  --root data/processed/stage7 \
+  --recommendation-input \
+  data/processed/stage6/stage6-recommendations-01/recommendation-input.json \
+  --output data/processed/stage7/stage7-audit.json
+```
+
+The audit regenerates the ten deterministic scenarios and independently rebuilds each hardware
+contract, dynamic recommendation, recovery observation, controller step, domain transition, and
+epoch from the recorded invocation samples. It also verifies the controlled-injection provenance,
+window labels, sample counts, expected success and rollback outcomes, and safe boundaries. A
+top-level `pass` field alone is therefore insufficient: modified samples, evidence, actions, or
+transitions cause the audit to fail.

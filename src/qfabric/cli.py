@@ -53,6 +53,7 @@ from .recovery import (
     replay_recovery,
     write_recovery_report,
 )
+from .recovery_audit import audit_stage7, write_stage7_audit
 from .recovery_closed_loop import run_hardware_recovery, write_hardware_recovery
 from .recovery_evidence import (
     derive_recovery_evidence,
@@ -200,6 +201,12 @@ def build_parser() -> argparse.ArgumentParser:
     recover_hardware.add_argument("--injected-delay-us", type=int, default=20_000)
     recover_hardware.add_argument("--timeout", type=float, default=2.0)
     recover_hardware.add_argument("--output", type=Path, required=True)
+    recover_audit = recover_subparsers.add_parser(
+        "audit", help="validate complete Stage 7 deterministic and hardware evidence"
+    )
+    recover_audit.add_argument("--root", type=Path, required=True)
+    recover_audit.add_argument("--recommendation-input", type=Path, required=True)
+    recover_audit.add_argument("--output", type=Path, required=True)
 
     contract = subparsers.add_parser(
         "contract", help="evaluate an empirical soft real-time contract"
@@ -489,6 +496,14 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"hardware report: {args.output}")
                 for failure in report["failures"]:
                     print(f"- failed check: {failure}", file=sys.stderr)
+                return 0 if report["status"] == "pass" else 1
+            if args.recover_command == "audit":
+                report = audit_stage7(args.root, args.recommendation_input)
+                write_stage7_audit(report, args.output)
+                print(f"Stage 7 audit: {report['status']}")
+                print(f"audit report: {args.output}")
+                for failure in report["failures"]:
+                    print(f"- {failure}", file=sys.stderr)
                 return 0 if report["status"] == "pass" else 1
             policy, initial_domain, initial_epoch, observations = load_recovery_trace(
                 args.input

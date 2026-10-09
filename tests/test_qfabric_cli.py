@@ -56,6 +56,31 @@ class QFabricCliTests(unittest.TestCase):
             self.assertEqual(run.call_args.kwargs["deadline_ns"], 20_000_000)
             write.assert_called_once_with(report, output_path)
 
+    def test_stage7_audit_command(self) -> None:
+        report = {"status": "pass", "failures": []}
+        output = io.StringIO()
+        with (
+            patch("qfabric.cli.audit_stage7", return_value=report) as audit,
+            patch("qfabric.cli.write_stage7_audit") as write,
+            contextlib.redirect_stdout(output),
+        ):
+            status = main(
+                [
+                    "recover",
+                    "audit",
+                    "--root",
+                    "stage7-root",
+                    "--recommendation-input",
+                    "recommendation.json",
+                    "--output",
+                    "audit.json",
+                ]
+            )
+        self.assertEqual(status, 0)
+        audit.assert_called_once_with(Path("stage7-root"), Path("recommendation.json"))
+        write.assert_called_once_with(report, Path("audit.json"))
+        self.assertIn("Stage 7 audit: pass", output.getvalue())
+
     def test_recovery_trace_replay_command(self) -> None:
         trace = {
             "schema_version": 1,

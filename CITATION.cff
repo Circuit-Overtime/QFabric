@@ -6,7 +6,7 @@ authors:
   - family-names: "Bhattacharya"
     given-names: "Ayushman"
     email: "ayushman@myceli.ai"
-version: 0.1.0
+version: 1.0.0
 date-released: 2026-10-09
 repository-code: "https://github.com/Circuit-Overtime/QFabric"
 url: "https://github.com/Circuit-Overtime/QFabric"
@@ -21,5 +21,5 @@ preferred-citation:
       email: "ayushman@myceli.ai"
   title: "QFabric: Contract-Driven Cross-Domain Task Recovery"
   year: 2026
-  version: "v0.1.0"
+  version: "v1.0.0"
   repository-code: "https://github.com/Circuit-Overtime/QFabric"

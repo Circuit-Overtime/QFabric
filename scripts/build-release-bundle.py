@@ -33,7 +33,7 @@ def git_commit() -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", default="0.1.0")
+    parser.add_argument("--version", default="1.0.0")
     args = parser.parse_args()
 
     version = args.version

@@ -1,7 +1,32 @@
 # Changelog
 
 All notable changes to QFabric are documented in this file. The project follows
-Semantic Versioning while the public API remains in initial development.
+Semantic Versioning.
+
+## [1.0.0] - 2026-10-09
+
+### Stable release
+
+- Declared the `qf` command-line interface, QTask ABI version 1, report schemas,
+  and contract/recovery state semantics as the first stable compatibility
+  baseline.
+- Promoted the package from alpha to production/stable status after the complete
+  staged audit, research evaluation, TestPyPI installation test, and public
+  `0.1.0` release validation.
+- Preserved the `qf-stage1` command as a compatibility entry point for the
+  Stage 1 measurement tooling.
+- Reissued the reproducible research bundle under the stable version, including
+  the paper, Stage 11 evaluation, package distributions, manifest, and checksums.
+
+### Compatibility policy
+
+- Backward-incompatible changes to the stable CLI, QTask ABI, or persisted
+  report schemas require a new major release.
+- New backward-compatible functionality may be introduced in minor releases;
+  fixes that preserve the public surface may be introduced in patch releases.
+- The empirical and hardware limitations documented for `0.1.0` remain in
+  force; stability is an interface and artifact guarantee, not a hard real-time
+  certification.
 
 ## [0.1.0] - 2026-10-09
 
@@ -24,4 +49,5 @@ Semantic Versioning while the public API remains in initial development.
 - Claims are empirical soft real-time claims, not hard real-time guarantees.
 - Hardware control commands require the matching repository firmware and board.
 
+[1.0.0]: https://github.com/Circuit-Overtime/QFabric/releases/tag/v1.0.0
 [0.1.0]: https://github.com/Circuit-Overtime/QFabric/releases/tag/v0.1.0

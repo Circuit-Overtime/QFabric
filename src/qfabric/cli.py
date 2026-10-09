@@ -47,6 +47,12 @@ from .recommendation_input import (
     write_recommendation_input,
 )
 from .recommendation_scenarios import run_recommendation_scenarios, write_scenario_suite
+from .recovery import (
+    load_recovery_trace,
+    render_recovery,
+    replay_recovery,
+    write_recovery_report,
+)
 from .runtime import parse_add_arguments, run_linux, run_rt
 
 
@@ -149,6 +155,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--operations", type=Path, default=Path("config/stage6-operations.json")
     )
     recommend_audit.add_argument("--output", type=Path, required=True)
+
+    recover = subparsers.add_parser("recover", help="evaluate safe closed-loop recovery traces")
+    recover_subparsers = recover.add_subparsers(dest="recover_command", required=True)
+    recover_replay = recover_subparsers.add_parser(
+        "replay", help="deterministically replay a recovery trace"
+    )
+    recover_replay.add_argument("--input", type=Path, required=True)
+    recover_replay.add_argument("--output", type=Path, required=True)
+    recover_replay.add_argument("--json", action="store_true", dest="as_json")
 
     contract = subparsers.add_parser(
         "contract", help="evaluate an empirical soft real-time contract"
@@ -382,6 +397,27 @@ def main(argv: list[str] | None = None) -> int:
             for failure in report["failures"]:
                 print(f"- {failure}", file=sys.stderr)
             return 0 if report["status"] == "pass" else 1
+
+        if args.command == "recover":
+            if task_arguments:
+                raise ValueError("qf recover does not accept task arguments")
+            policy, initial_domain, initial_epoch, observations = load_recovery_trace(
+                args.input
+            )
+            report = replay_recovery(
+                policy,
+                observations,
+                initial_domain=initial_domain,
+                initial_epoch=initial_epoch,
+            )
+            write_recovery_report(report, args.output)
+            print(
+                json.dumps(report, indent=2, sort_keys=True)
+                if args.as_json
+                else render_recovery(report)
+            )
+            print(f"recovery report: {args.output}")
+            return 0
 
         if args.command == "contract":
             if task_arguments:

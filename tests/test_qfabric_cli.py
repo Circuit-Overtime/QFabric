@@ -12,6 +12,43 @@ from qfabric.profiling import Instrumentation, ProfileCollector, ProfileSample, 
 
 
 class QFabricCliTests(unittest.TestCase):
+    def test_recovery_trace_replay_command(self) -> None:
+        trace = {
+            "schema_version": 1,
+            "policy": {
+                "probation_windows": 2,
+                "probation_max_windows": 3,
+                "cooldown_windows": 2,
+                "blacklist_windows": 3,
+            },
+            "initial": {"domain": "linux", "epoch": 4},
+            "observations": [
+                {
+                    "source_contract_state": "AT_RISK",
+                    "evidence_valid": True,
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            trace_path = Path(directory) / "trace.json"
+            report_path = Path(directory) / "report.json"
+            trace_path.write_text(json.dumps(trace), encoding="utf-8")
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                status = main(
+                    [
+                        "recover",
+                        "replay",
+                        "--input",
+                        str(trace_path),
+                        "--output",
+                        str(report_path),
+                    ]
+                )
+            self.assertEqual(status, 0)
+            self.assertIn("final state: MONITORING", output.getvalue())
+            self.assertEqual(json.loads(report_path.read_text())["final"]["epoch"], 4)
+
     def test_recommend_and_filtered_recommend_commands(self) -> None:
         source = {
             "schema_version": 1,

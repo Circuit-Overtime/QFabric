@@ -35,7 +35,8 @@ the [Stage 6 specification](docs/stage-6-recommendations.md) and
 
 Stage 7 is the current stage and the core novelty target: safe closed-loop recovery from credible
 empirical timing-contract violations, including probation, commit, rollback, cooldown, and
-candidate blacklisting.
+candidate blacklisting. The version 1 protocol is specified in the
+[Stage 7 recovery specification](docs/stage-7-recovery.md).
 
 ## Local checks
 

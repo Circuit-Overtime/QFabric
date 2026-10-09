@@ -141,6 +141,13 @@ def _read_text(path: Path) -> str | None:
         return None
 
 
+def _is_file(path: Path) -> bool:
+    try:
+        return path.is_file()
+    except OSError:
+        return False
+
+
 def _kernel_config() -> str:
     release = platform.release()
     return _read_text(Path(f"/boot/config-{release}")) or ""
@@ -168,7 +175,7 @@ def probe_kernel_capabilities() -> dict[str, object]:
     debug_trace_root = Path("/sys/kernel/debug/tracing")
     scheduler_tracepoints = {
         name: any(
-            (root / "events" / "sched" / name / "id").is_file()
+            _is_file(root / "events" / "sched" / name / "id")
             for root in (trace_root, debug_trace_root)
         )
         for name in ("sched_switch", "sched_wakeup", "sched_wakeup_new")
@@ -192,7 +199,7 @@ def probe_kernel_capabilities() -> dict[str, object]:
         },
         "interfaces": {
             "perf_software_events": perf_events,
-            "psi_cpu": Path("/proc/pressure/cpu").is_file(),
+            "psi_cpu": _is_file(Path("/proc/pressure/cpu")),
             "process_schedstat": {
                 "available": schedstat is not None,
                 "wait_time_effective": (
@@ -202,7 +209,7 @@ def probe_kernel_capabilities() -> dict[str, object]:
                 "kernel_config_enabled": "CONFIG_SCHEDSTATS=y" in config,
             },
             "scheduler_tracepoints": scheduler_tracepoints,
-            "btf": Path("/sys/kernel/btf/vmlinux").is_file(),
+            "btf": _is_file(Path("/sys/kernel/btf/vmlinux")),
         },
         "selection": {
             "mechanism": (

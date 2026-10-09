@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from qfabric.kernel_audit import audit_stage10
-from qfabric.kernel_instrumentation import _syscall_number, run_kernel_benchmark
+from qfabric.kernel_instrumentation import _is_file, _syscall_number, run_kernel_benchmark
 
 
 def benchmark(mode: str, *, p95: int, forced: bool = False) -> dict[str, object]:
@@ -40,6 +40,10 @@ class QFabricKernelInstrumentationTests(unittest.TestCase):
         self.assertEqual(_syscall_number("x86_64"), 298)
         with self.assertRaises(OSError):
             _syscall_number("unsupported")
+
+    def test_permission_denied_optional_interface_is_reported_unavailable(self):
+        with patch("pathlib.Path.is_file", side_effect=PermissionError):
+            self.assertFalse(_is_file(Path("/restricted/tracepoint")))
 
     def test_forced_perf_failure_keeps_userspace_benchmark_available(self):
         with tempfile.TemporaryDirectory() as directory:

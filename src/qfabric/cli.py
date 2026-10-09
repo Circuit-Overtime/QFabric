@@ -39,6 +39,12 @@ from .decision_records import (
     replay_decision,
 )
 from .explanations import explain_decision, render_explanation, render_replay
+from .kernel_audit import audit_stage10, write_stage10_audit
+from .kernel_instrumentation import (
+    probe_kernel_capabilities,
+    run_kernel_benchmark,
+    write_json_report,
+)
 from .profile_analysis import analyze_profile, write_profile_analysis
 from .profile_audit import audit_stage4, write_stage4_audit
 from .profile_runner import run_profile_campaign
@@ -315,6 +321,34 @@ def build_parser() -> argparse.ArgumentParser:
     )
     view_audit.add_argument("--maximum-p95-regression-pct", type=float, default=15.0)
     view_audit.add_argument("--output", type=Path, required=True)
+
+    kernel = subparsers.add_parser(
+        "kernel", help="inspect and benchmark optional Stage 10 kernel instrumentation"
+    )
+    kernel_subparsers = kernel.add_subparsers(dest="kernel_command", required=True)
+    kernel_capabilities = kernel_subparsers.add_parser(
+        "capabilities", help="report stock-kernel measurement interfaces"
+    )
+    kernel_capabilities.add_argument("--output", type=Path, required=True)
+    kernel_benchmark = kernel_subparsers.add_parser(
+        "benchmark", help="benchmark userspace or perf-counter attribution"
+    )
+    kernel_benchmark.add_argument("--root", type=Path, default=Path.cwd())
+    kernel_benchmark.add_argument("--iterations", type=int, default=500)
+    kernel_benchmark.add_argument("--warmup", type=int, default=50)
+    kernel_benchmark.add_argument("--timeout", type=float, default=2.0)
+    kernel_benchmark.add_argument("--force-fallback", action="store_true")
+    kernel_benchmark.add_argument("--output", type=Path, required=True)
+    kernel_audit = kernel_subparsers.add_parser(
+        "audit", help="audit Stage 10 necessity, overhead, and safe fallback"
+    )
+    kernel_audit.add_argument("--capabilities", type=Path, required=True)
+    kernel_audit.add_argument("--stage4-profile", type=Path, required=True)
+    kernel_audit.add_argument("--baseline", type=Path, action="append", required=True)
+    kernel_audit.add_argument("--perf", type=Path, action="append", required=True)
+    kernel_audit.add_argument("--fallback", type=Path, required=True)
+    kernel_audit.add_argument("--maximum-p95-overhead-pct", type=float, default=15.0)
+    kernel_audit.add_argument("--output", type=Path, required=True)
 
     contract = subparsers.add_parser(
         "contract", help="evaluate an empirical soft real-time contract"
@@ -763,6 +797,42 @@ def main(argv: list[str] | None = None) -> int:
             )
             write_stage9_audit(report, args.output)
             print(f"Stage 9 audit: {report['status']}")
+            print(f"audit report: {args.output}")
+            for failure in report["failures"]:
+                print(f"- {failure}", file=sys.stderr)
+            return 0 if report["status"] == "pass" else 1
+
+        if args.command == "kernel":
+            if task_arguments:
+                raise ValueError("qf kernel does not accept task arguments")
+            if args.kernel_command == "capabilities":
+                report = probe_kernel_capabilities()
+                write_json_report(report, args.output)
+                print(f"Stage 10 kernel capabilities: {report['selection']['mechanism']}")
+                print(f"capability report: {args.output}")
+                return 0
+            if args.kernel_command == "benchmark":
+                report = run_kernel_benchmark(
+                    args.root.resolve(),
+                    iterations=args.iterations,
+                    warmup=args.warmup,
+                    timeout=args.timeout,
+                    force_fallback=args.force_fallback,
+                )
+                write_json_report(report, args.output)
+                print(f"Stage 10 kernel benchmark ({report['mode']}): {report['status']}")
+                print(f"benchmark report: {args.output}")
+                return 0 if report["status"] == "pass" else 1
+            report = audit_stage10(
+                args.capabilities,
+                args.stage4_profile,
+                args.baseline,
+                args.perf,
+                args.fallback,
+                maximum_p95_overhead_pct=args.maximum_p95_overhead_pct,
+            )
+            write_stage10_audit(report, args.output)
+            print(f"Stage 10 audit: {report['status']}")
             print(f"audit report: {args.output}")
             for failure in report["failures"]:
                 print(f"- {failure}", file=sys.stderr)

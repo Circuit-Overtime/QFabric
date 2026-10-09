@@ -28,9 +28,14 @@ real-time contract states and transitions. The semantics and hardware evidence a
 the [Stage 5 specification](docs/stage-5-contracts.md) and
 [Stage 5 findings](docs/stage-5-findings.md).
 
-Stage 6 is the current stage. It will build a gated, explainable recommendation engine over the
-measured end-to-end evidence without changing live placement. The version 1 policy is specified in
-the [Stage 6 recommendation specification](docs/stage-6-recommendations.md).
+Stage 6 is complete. It provides gated, explainable, deterministic recommendations over measured
+end-to-end evidence without changing live placement. The policy and audit evidence are recorded in
+the [Stage 6 specification](docs/stage-6-recommendations.md) and
+[Stage 6 findings](docs/stage-6-findings.md).
+
+Stage 7 is the current stage and the core novelty target: safe closed-loop recovery from credible
+empirical timing-contract violations, including probation, commit, rollback, cooldown, and
+candidate blacklisting.
 
 ## Local checks
 

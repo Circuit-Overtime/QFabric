@@ -4,6 +4,9 @@ Stage 6 recommends an execution domain from measured evidence. It is strictly ad
 a recommendation never invokes a task, changes placement, deploys firmware, or mutates runtime
 state.
 
+The completed recommendation evidence and limitations are recorded in the
+[Stage 6 findings](stage-6-findings.md).
+
 ## Policy boundary
 
 The `gated-static-end-to-end-v1` policy compares Linux and RT using measured p95 end-to-end

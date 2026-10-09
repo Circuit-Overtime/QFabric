@@ -4,6 +4,8 @@ import argparse
 import sys
 from pathlib import Path
 
+from .abi import Schema
+from .abi_tools import build_golden_vectors, write_golden_vectors
 from .audit import audit_stage2, write_audit
 from .build import build_stage2
 from .runtime import parse_add_arguments, run_linux, run_rt
@@ -15,6 +17,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     build = subparsers.add_parser("build", help="build Linux ARM64 and RT MCU artifacts")
     build.add_argument("--root", type=Path, default=Path.cwd())
+
+    abi = subparsers.add_parser("abi", help="validate the ABI schema and golden vectors")
+    abi_subparsers = abi.add_subparsers(dest="abi_command", required=True)
+    abi_check = abi_subparsers.add_parser("check", help="validate ABI declarations")
+    abi_check.add_argument("--schema", type=Path, default=Path("config/qfabric-abi.json"))
+    abi_vectors = abi_subparsers.add_parser("vectors", help="generate canonical golden vectors")
+    abi_vectors.add_argument("--schema", type=Path, default=Path("config/qfabric-abi.json"))
+    abi_vectors.add_argument("--output", type=Path, default=Path("abi/golden-vectors.json"))
 
     audit = subparsers.add_parser("audit", help="validate the complete Stage 2 evidence")
     audit.add_argument("--root", type=Path, default=Path.cwd())
@@ -51,6 +61,21 @@ def main(argv: list[str] | None = None) -> int:
         raw_arguments = raw_arguments[:separator]
     args = build_parser().parse_args(raw_arguments)
     try:
+        if args.command == "abi":
+            if task_arguments:
+                raise ValueError("qf abi does not accept task arguments")
+            if args.abi_command == "check":
+                schema = Schema.load(args.schema)
+                print(
+                    f"ABI schema valid: {len(schema.tasks)} tasks, "
+                    f"{len(schema.types)} named types"
+                )
+                return 0
+            vectors = build_golden_vectors(args.schema)
+            write_golden_vectors(vectors, args.output)
+            print(f"golden vectors: {args.output}")
+            return 0
+
         if args.command == "build":
             if task_arguments:
                 raise ValueError("qf build does not accept task arguments")

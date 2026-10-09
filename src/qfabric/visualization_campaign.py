@@ -13,6 +13,7 @@ CASES = (
     ("contracts-unknown", "contracts", 3, "UNKNOWN", "stable"),
     ("contracts-at-risk", "contracts", 6, "AT_RISK", "stable"),
     ("contracts-violated", "contracts", 12, "VIOLATED", "stable"),
+    ("contracts-recovered", "contracts", 14, "SATISFIED", "stable"),
     ("jitter-measured", "jitter", 11, "VIOLATED", "rollback"),
     ("ipc-active", "ipc", 6, "AT_RISK", "stable"),
     ("placement-rollback", "placement", 11, "VIOLATED", "rollback"),

@@ -46,9 +46,14 @@ recommendations and Stage 7 recovery actions. The schema, evidence, audit, and t
 are recorded in the [Stage 8 specification](docs/stage-8-decisions.md) and
 [Stage 8 findings](docs/stage-8-findings.md).
 
-Stage 9 is the current stage. It builds the LED matrix and RGB physical observability interface
-tracked in [issue #10](https://github.com/Circuit-Overtime/QFabric/issues/10), driven only by real
-QFabric telemetry and stable decision identifiers.
+Stage 9 is complete. It provides a bounded, disableable LED matrix and RGB physical debugger driven
+only by real QFabric telemetry and stable decision identifiers. Its state grammar, update path,
+hardware coverage, controlled overhead experiment, and limitations are recorded in the
+[Stage 9 specification](docs/stage-9-visualization.md) and
+[Stage 9 findings](docs/stage-9-findings.md).
+
+Stage 10 is the current stage. It adds only necessary kernel/eBPF instrumentation, tracked in
+[issue #11](https://github.com/Circuit-Overtime/QFabric/issues/11).
 
 ## Local checks
 

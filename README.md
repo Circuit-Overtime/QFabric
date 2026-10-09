@@ -52,8 +52,15 @@ hardware coverage, controlled overhead experiment, and limitations are recorded 
 [Stage 9 specification](docs/stage-9-visualization.md) and
 [Stage 9 findings](docs/stage-9-findings.md).
 
-Stage 10 is the current stage. It adds only necessary kernel/eBPF instrumentation, tracked in
-[issue #11](https://github.com/Circuit-Overtime/QFabric/issues/11).
+Stage 10 is complete. It adds only the standard Linux perf instrumentation justified by a measured
+userspace attribution gap, preserves the userspace-only fallback, and deliberately introduces no
+eBPF program or kernel module. The architecture, privileges, limitations, controlled accuracy and
+overhead results are recorded in the
+[Stage 10 specification](docs/stage-10-kernel-instrumentation.md) and
+[Stage 10 findings](docs/stage-10-findings.md).
+
+Stage 11 is the current stage. It completes end-to-end benchmarks, baselines, evaluation, and
+paper-ready results, tracked in [issue #12](https://github.com/Circuit-Overtime/QFabric/issues/12).
 
 ## Local checks
 

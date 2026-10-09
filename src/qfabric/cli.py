@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from .abi import Schema
+from .abi_audit import audit_stage3, write_stage3_audit
 from .abi_codegen import generate_cpp_header, write_cpp_header
 from .abi_probe import probe_mcu_abi, write_probe_report
 from .abi_tools import build_golden_vectors, run_compile_fail_cases, write_golden_vectors
@@ -43,6 +44,11 @@ def build_parser() -> argparse.ArgumentParser:
     abi_compile_fail.add_argument(
         "--cases", type=Path, default=Path("tests/abi_compile_fail")
     )
+    abi_audit = abi_subparsers.add_parser("audit", help="validate complete Stage 3 evidence")
+    abi_audit.add_argument("--root", type=Path, default=Path.cwd())
+    abi_audit.add_argument("--output", type=Path, required=True)
+    abi_audit.add_argument("--timeout", type=float, default=2.0)
+    abi_audit.add_argument("--address", default="unix:///var/run/arduino-router.sock")
 
     audit = subparsers.add_parser("audit", help="validate the complete Stage 2 evidence")
     audit.add_argument("--root", type=Path, default=Path.cwd())
@@ -107,6 +113,14 @@ def main(argv: list[str] | None = None) -> int:
                 for case in report["cases"]:
                     marker = "PASS" if case["rejected"] else "FAIL"
                     print(f"[{marker}] {case['case']}: {case['diagnostic'] or 'accepted'}")
+                for failure in report["failures"]:
+                    print(f"- {failure}", file=sys.stderr)
+                return 0 if report["status"] == "pass" else 1
+            if args.abi_command == "audit":
+                report = audit_stage3(args.root.resolve(), args.address, timeout=args.timeout)
+                write_stage3_audit(report, args.output)
+                print(f"Stage 3 audit: {report['status']}")
+                print(f"audit report: {args.output}")
                 for failure in report["failures"]:
                     print(f"- {failure}", file=sys.stderr)
                 return 0 if report["status"] == "pass" else 1

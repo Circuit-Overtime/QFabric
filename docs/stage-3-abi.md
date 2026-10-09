@@ -97,3 +97,16 @@ vectors and exercise its defensive decoder with:
 ```bash
 qf abi probe --output data/processed/stage3-mcu-abi-probe.json
 ```
+
+## Completion audit
+
+Run the final audit on the UNO Q after copying the ARM64 runner and installing the Stage 3
+firmware:
+
+```bash
+qf abi audit --output data/processed/stage3-audit.json
+```
+
+The audit regenerates the C++ header and golden vectors in memory, runs all compile-fail cases,
+executes the real ARM64 runner, repeats the live MCU vectors and safety scenarios, and verifies
+the effect-policy invariants. Stage 3 is complete only when this command reports `pass`.

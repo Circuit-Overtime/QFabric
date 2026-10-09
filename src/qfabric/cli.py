@@ -13,6 +13,12 @@ from .abi_probe import probe_mcu_abi, write_probe_report
 from .abi_tools import build_golden_vectors, run_compile_fail_cases, write_golden_vectors
 from .audit import audit_stage2, write_audit
 from .build import build_stage2
+from .contracts import (
+    load_contract_trace,
+    render_contract_status,
+    replay_contract,
+    write_contract_report,
+)
 from .profile_analysis import analyze_profile, write_profile_analysis
 from .profile_audit import audit_stage4, write_stage4_audit
 from .profile_runner import run_profile_campaign
@@ -68,6 +74,17 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--root", type=Path, default=Path.cwd())
     run.add_argument("--timeout", type=float, default=2.0)
     run.add_argument("--address", default="unix:///var/run/arduino-router.sock")
+
+    contract = subparsers.add_parser(
+        "contract", help="evaluate an empirical soft real-time contract"
+    )
+    contract_subparsers = contract.add_subparsers(dest="contract_command", required=True)
+    contract_replay = contract_subparsers.add_parser(
+        "replay", help="deterministically replay a recorded contract trace"
+    )
+    contract_replay.add_argument("--input", type=Path, required=True)
+    contract_replay.add_argument("--output", type=Path, required=True)
+    contract_replay.add_argument("--json", action="store_true", dest="as_json")
 
     status = subparsers.add_parser("status", help="show the latest persisted QTask profile")
     status.add_argument("--input", type=Path, default=Path(".qfabric/profile.json"))
@@ -197,6 +214,21 @@ def main(argv: list[str] | None = None) -> int:
             for failure in result["failures"]:
                 print(f"- {failure}", file=sys.stderr)
             return 0 if result["status"] == "pass" else 1
+
+        if args.command == "contract":
+            if task_arguments:
+                raise ValueError("qf contract does not accept task arguments")
+            contract, observations = load_contract_trace(args.input)
+            report = replay_contract(contract, observations)
+            write_contract_report(report, args.output)
+            rendered = (
+                json.dumps(report, indent=2, sort_keys=True)
+                if args.as_json
+                else render_contract_status(report)
+            )
+            print(rendered)
+            print(f"contract report: {args.output}")
+            return 0
 
         if args.command == "status":
             if task_arguments:

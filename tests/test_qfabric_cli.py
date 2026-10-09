@@ -7,10 +7,52 @@ from pathlib import Path
 from unittest.mock import patch
 
 from qfabric.cli import main
+from qfabric.contracts import ContractObservation, DeadlineContract
 from qfabric.profiling import Instrumentation, ProfileCollector, ProfileSample, write_profile
 
 
 class QFabricCliTests(unittest.TestCase):
+    def test_contract_trace_replay_command(self) -> None:
+        contract = DeadlineContract(
+            deadline_ns=100,
+            window_size=2,
+            minimum_samples=2,
+            warmup_samples=0,
+            max_miss_rate_pct=25,
+            at_risk_miss_rate_pct=10,
+            recovery_miss_rate_pct=0,
+            violation_windows=2,
+            recovery_windows=2,
+            infeasible_windows=3,
+        )
+        trace = {
+            "schema_version": 1,
+            "contract": contract.to_dict(),
+            "observations": [
+                ContractObservation("ok", 50).to_dict(),
+                ContractObservation("ok", 60).to_dict(),
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            trace_path = Path(directory) / "trace.json"
+            report_path = Path(directory) / "report.json"
+            trace_path.write_text(json.dumps(trace), encoding="utf-8")
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                status = main(
+                    [
+                        "contract",
+                        "replay",
+                        "--input",
+                        str(trace_path),
+                        "--output",
+                        str(report_path),
+                    ]
+                )
+            self.assertEqual(status, 0)
+            self.assertIn("state: SATISFIED", output.getvalue())
+            self.assertEqual(json.loads(report_path.read_text())["state"], "SATISFIED")
+
     def test_status_human_and_json_output(self) -> None:
         collector = ProfileCollector(capacity=2, warmup=0, minimum_samples=1)
         collector.add(

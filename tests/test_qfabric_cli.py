@@ -12,6 +12,35 @@ from qfabric.profiling import Instrumentation, ProfileCollector, ProfileSample, 
 
 
 class QFabricCliTests(unittest.TestCase):
+    def test_required_stage9_view_interface(self) -> None:
+        report = {
+            "mode": "placement",
+            "decision_id": 11,
+            "diagnostics": {
+                "applied_frames": 2,
+                "changed_pixels": 12,
+                "maximum_draw_us": 8,
+            },
+        }
+        output = io.StringIO()
+        with (
+            patch("qfabric.cli.set_view", return_value=report) as view,
+            contextlib.redirect_stdout(output),
+        ):
+            status = main(
+                [
+                    "view",
+                    "placement",
+                    "--decision",
+                    "11",
+                    "--history",
+                    "decisions.jsonl",
+                ]
+            )
+        self.assertEqual(status, 0)
+        self.assertIn("QFabric physical view: placement", output.getvalue())
+        self.assertEqual(view.call_args.kwargs["decision_id"], 11)
+        self.assertEqual(view.call_args.kwargs["refresh_hz"], 8)
     def test_bounded_hardware_recovery_command(self) -> None:
         source = {
             "schema_version": 1,

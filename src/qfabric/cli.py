@@ -71,6 +71,7 @@ from .recovery_evidence import (
 )
 from .recovery_scenarios import run_recovery_scenarios, write_recovery_scenarios
 from .runtime import parse_add_arguments, run_linux, run_rt
+from .visualization_runtime import set_view
 
 
 def _parse_positive_ints(value: str) -> list[int]:
@@ -271,6 +272,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--history", type=Path, default=Path(".qfabric/decisions.jsonl")
     )
     replay.add_argument("--json", action="store_true", dest="as_json")
+
+    view = subparsers.add_parser("view", help="drive the Stage 9 physical observability view")
+    view.add_argument(
+        "mode", choices=("placement", "contracts", "jitter", "ipc", "off")
+    )
+    view.add_argument("--task", default="add")
+    view.add_argument("--decision", type=int)
+    view.add_argument(
+        "--history", type=Path, default=Path(".qfabric/decisions.jsonl")
+    )
+    view.add_argument("--refresh-hz", type=int, default=8)
+    view.add_argument("--overlay-ms", type=int, default=500)
+    view.add_argument("--timeout", type=float, default=2.0)
+    view.add_argument("--address", default="unix:///var/run/arduino-router.sock")
+    view.add_argument("--json", action="store_true", dest="as_json")
 
     contract = subparsers.add_parser(
         "contract", help="evaluate an empirical soft real-time contract"
@@ -666,6 +682,30 @@ def main(argv: list[str] | None = None) -> int:
                 else render_replay(report)
             )
             return 0 if report["matches"] else 1
+
+        if args.command == "view":
+            if task_arguments:
+                raise ValueError("qf view does not accept task arguments")
+            report = set_view(
+                args.mode,
+                history=args.history,
+                task=args.task,
+                decision_id=args.decision,
+                address=args.address,
+                refresh_hz=args.refresh_hz,
+                overlay_ms=args.overlay_ms,
+                timeout=args.timeout,
+            )
+            if args.as_json:
+                print(json.dumps(report, indent=2, sort_keys=True))
+            else:
+                decision = report["decision_id"]
+                print(f"QFabric physical view: {report['mode']}")
+                print(f"- decision: {decision if decision is not None else 'none'}")
+                print(f"- applied frames: {report['diagnostics']['applied_frames']}")
+                print(f"- changed pixels: {report['diagnostics']['changed_pixels']}")
+                print(f"- maximum draw: {report['diagnostics']['maximum_draw_us']} us")
+            return 0
 
         if args.command == "contract":
             if task_arguments:

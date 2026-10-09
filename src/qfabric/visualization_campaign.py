@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .visualization_runtime import MODE_IDS, set_view
+from .visualization_runtime import MODE_IDS, linux_system_led_snapshot, set_view
 
 CASES = (
     ("placement-stable", "placement", 1, "SATISFIED", "stable"),
@@ -57,6 +57,18 @@ def _validate_case(
         failures.append("MCU did not apply a frame")
     if diagnostics["last_draw_us"] < 0:
         failures.append("MCU reported an invalid draw duration")
+    health = {
+        "UNKNOWN": 0x0000FF,
+        "SATISFIED": 0x00FF00,
+        "AT_RISK": 0xFFFF00,
+        "VIOLATED": 0xFF0000,
+    }[state]
+    expected_linux_rgb = health if telemetry["domain"] == "linux" else 0
+    expected_mcu_rgb = health if telemetry["domain"] == "rt" else 0
+    if report["linux_user_rgb"] != expected_linux_rgb:
+        failures.append("Linux user RGB does not match Linux-domain health")
+    if diagnostics["health_rgb"] != expected_mcu_rgb:
+        failures.append("MCU health RGB does not match RT-domain health")
     return failures
 
 
@@ -71,6 +83,7 @@ def run_visualization_campaign(
     cases: list[dict[str, object]] = []
     failures: list[str] = []
     off: dict[str, object] | None = None
+    system_leds_before = linux_system_led_snapshot()
     try:
         for name, mode, decision_id, state, event in CASES:
             report = set_view(
@@ -111,12 +124,17 @@ def run_visualization_campaign(
             timeout=timeout,
         )
     off_diagnostics = off["diagnostics"]
+    system_leds_after = linux_system_led_snapshot()
     if (
         off_diagnostics["mode_id"] != 0
         or off_diagnostics["target_refresh_hz"] != 0
         or off_diagnostics["frame_checksum"] != 0
     ):
         failures.append("off: MCU did not enter a blank disabled state")
+    if off["linux_user_rgb"] != 0:
+        failures.append("off: Linux user RGB did not turn off")
+    if system_leds_before != system_leds_after:
+        failures.append("Linux system LED state changed during visualization")
     return {
         "schema_version": 1,
         "captured_utc": datetime.now(UTC).isoformat(),
@@ -129,6 +147,11 @@ def run_visualization_campaign(
         },
         "cases": cases,
         "off": off,
+        "linux_system_leds": {
+            "before": system_leds_before,
+            "after": system_leds_after,
+            "preserved": system_leds_before == system_leds_after,
+        },
         "failures": failures,
     }
 

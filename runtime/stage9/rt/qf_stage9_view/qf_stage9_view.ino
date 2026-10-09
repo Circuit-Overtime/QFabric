@@ -33,6 +33,8 @@ std::uint32_t qf_changed_pixels = 0;
 std::uint32_t qf_last_decision_id = 0;
 std::uint32_t qf_maximum_draw_us = 0;
 std::uint32_t qf_last_draw_us = 0;
+std::uint32_t qf_current_health_rgb = 0;
+std::uint32_t qf_current_activity_rgb = 0;
 
 std::uint32_t qf_last_epoch = 0;
 std::uint32_t qf_last_invocation = 0;
@@ -138,6 +140,8 @@ std::uint32_t qf_stage9_diagnostic(std::uint32_t diagnostic) {
     case 7: return qf_maximum_draw_us;
     case 8: return qf_last_draw_us;
     case 9: return qf_frame_checksum();
+    case 10: return qf_current_health_rgb;
+    case 11: return qf_current_activity_rgb;
     default: return UINT32_MAX;
   }
 }
@@ -217,6 +221,8 @@ void qf_apply_pending() {
   }
   qf_changed_pixels += changed;
   qf_last_decision_id = decision_id;
+  qf_current_health_rgb = health_rgb;
+  qf_current_activity_rgb = activity_rgb;
   ++qf_applied_frames;
 }
 

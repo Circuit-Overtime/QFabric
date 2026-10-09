@@ -64,9 +64,13 @@ def audit_stage9(
         off["mode_id"] == 0
         and off["target_refresh_hz"] == 0
         and off["frame_checksum"] == 0
+        and campaign["off"]["linux_user_rgb"] == 0
     )
     if not off_verified:
         failures.append("off mode is not blank and disabled")
+    system_leds_preserved = campaign.get("linux_system_leds", {}).get("preserved") is True
+    if not system_leds_preserved:
+        failures.append("Linux system LED state was not proven preserved")
 
     comparisons: list[dict[str, object]] = []
     protected_contracts_healthy = True
@@ -142,6 +146,7 @@ def audit_stage9(
             "event_coverage_complete": required_events <= events,
             "refresh_rate_bounded": refresh_bounded,
             "off_mode_verified": off_verified,
+            "linux_system_leds_preserved": system_leds_preserved,
             "protected_contracts_healthy": protected_contracts_healthy,
             "overhead_within_budget": overhead_within_budget,
         },

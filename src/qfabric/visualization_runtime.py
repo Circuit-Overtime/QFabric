@@ -23,6 +23,35 @@ MODE_IDS = {
     ViewMode.IPC: 4,
 }
 
+LINUX_USER_LEDS = {
+    "red": "red:user",
+    "green": "green:user",
+    "blue": "blue:user",
+}
+LINUX_SYSTEM_LEDS = ("red:panic", "green:wlan", "blue:bt")
+
+
+def _write_linux_user_rgb(packed: int, root: Path = Path("/sys/class/leds")) -> int:
+    masks = {"red": 0xFF0000, "green": 0x00FF00, "blue": 0x0000FF}
+    observed = 0
+    for channel, name in LINUX_USER_LEDS.items():
+        brightness = root / name / "brightness"
+        value = 1 if packed & masks[channel] else 0
+        brightness.write_text(f"{value}\n", encoding="ascii")
+        if int(brightness.read_text(encoding="ascii").strip()):
+            observed |= masks[channel]
+    return observed
+
+
+def linux_system_led_snapshot(root: Path = Path("/sys/class/leds")) -> dict[str, dict[str, str]]:
+    return {
+        name: {
+            field: (root / name / field).read_text(encoding="ascii").strip()
+            for field in ("brightness", "trigger")
+        }
+        for name in LINUX_SYSTEM_LEDS
+    }
+
 
 def _rgb(item: TaskTelemetry) -> tuple[int, int]:
     health = {
@@ -59,6 +88,8 @@ def _diagnostics(bridge: Any, timeout: float) -> dict[str, int]:
         "maximum_draw_us",
         "last_draw_us",
         "frame_checksum",
+        "health_rgb",
+        "activity_rgb",
     )
     return {
         name: int(bridge.call("qf_stage9_diagnostic", index, timeout=timeout))
@@ -93,6 +124,7 @@ def set_view(
         if configured is not True:
             raise RuntimeError("MCU rejected the visualization configuration")
         if selected_mode == ViewMode.OFF:
+            linux_user_rgb = _write_linux_user_rgb(0)
             time.sleep(0.15)
             return {
                 "schema_version": 1,
@@ -100,6 +132,7 @@ def set_view(
                 "decision_id": None,
                 "telemetry": None,
                 "frame_checksum": 0,
+                "linux_user_rgb": linux_user_rgb,
                 "diagnostics": _diagnostics(bridge, timeout),
             }
 
@@ -111,17 +144,20 @@ def set_view(
         base = render_frame(selected_mode, [item])
         overlay = render_frame(selected_mode, [item], overlay=item)
         health_rgb, activity_rgb = _rgb(item)
+        linux_health_rgb = health_rgb if item.domain == "linux" else 0
+        mcu_health_rgb = health_rgb if item.domain == "rt" else 0
 
         submitted = bridge.call(
             "qf_stage9_submit",
             item.decision_id,
-            health_rgb,
+            mcu_health_rgb,
             activity_rgb,
             _encode(overlay),
             timeout=timeout,
         )
         if submitted is not True:
             raise RuntimeError("MCU rejected the visualization frame")
+        linux_user_rgb = _write_linux_user_rgb(linux_health_rgb)
         if item.event != VisualEvent.STABLE and overlay_ms:
             time.sleep(overlay_ms / 1000)
             submitted = bridge.call(
@@ -142,6 +178,7 @@ def set_view(
             "telemetry": item.to_dict(),
             "frame_checksum": frame_checksum(base),
             "overlay_checksum": frame_checksum(overlay),
+            "linux_user_rgb": linux_user_rgb,
             "diagnostics": _diagnostics(bridge, timeout),
         }
     finally:

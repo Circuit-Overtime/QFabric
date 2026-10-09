@@ -49,12 +49,14 @@ class QFabricVisualizationAuditTests(unittest.TestCase):
             "configuration": {"refresh_hz": 8},
             "cases": cases,
             "off": {
+                "linux_user_rgb": 0,
                 "diagnostics": {
                     "mode_id": 0,
                     "target_refresh_hz": 0,
                     "frame_checksum": 0,
                 }
             },
+            "linux_system_leds": {"preserved": True},
         }
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -83,12 +85,14 @@ class QFabricVisualizationAuditTests(unittest.TestCase):
                         "configuration": {"refresh_hz": 20},
                         "cases": [],
                         "off": {
+                            "linux_user_rgb": 1,
                             "diagnostics": {
                                 "mode_id": 1,
                                 "target_refresh_hz": 8,
                                 "frame_checksum": 1,
                             }
                         },
+                        "linux_system_leds": {"preserved": False},
                     }
                 ),
                 encoding="utf-8",

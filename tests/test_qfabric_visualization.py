@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 from qfabric.visualization import (
     MATRIX_PIXELS,
@@ -10,6 +12,7 @@ from qfabric.visualization import (
     render_frame,
     telemetry_from_decision,
 )
+from qfabric.visualization_runtime import _write_linux_user_rgb
 
 
 def telemetry(**changes):
@@ -29,6 +32,19 @@ def telemetry(**changes):
 
 
 class QFabricVisualizationTests(unittest.TestCase):
+    def test_linux_user_rgb_writes_only_declared_user_channels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("red:user", "green:user", "blue:user", "red:panic"):
+                (root / name).mkdir()
+                (root / name / "brightness").write_text("0\n", encoding="ascii")
+            observed = _write_linux_user_rgb(0xFF00FF, root)
+            self.assertEqual(observed, 0xFF00FF)
+            self.assertEqual((root / "red:user" / "brightness").read_text(), "1\n")
+            self.assertEqual((root / "green:user" / "brightness").read_text(), "0\n")
+            self.assertEqual((root / "blue:user" / "brightness").read_text(), "1\n")
+            self.assertEqual((root / "red:panic" / "brightness").read_text(), "0\n")
+
     def test_five_views_respect_linux_rpc_rt_row_ownership(self):
         linux = telemetry(slot=0, domain="linux")
         rt = telemetry(slot=1, domain="rt", contract_state="AT_RISK")

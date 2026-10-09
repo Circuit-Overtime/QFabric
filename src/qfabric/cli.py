@@ -30,6 +30,7 @@ from .contracts import (
     replay_contract,
     write_contract_report,
 )
+from .decision_campaign import run_decision_campaign, write_decision_campaign
 from .decision_history import DecisionStore
 from .decision_records import (
     record_hardware_recovery,
@@ -235,6 +236,13 @@ def build_parser() -> argparse.ArgumentParser:
     history_recovery.add_argument(
         "--store", type=Path, default=Path(".qfabric/decisions.jsonl")
     )
+    history_campaign = history_subparsers.add_parser(
+        "campaign", help="build the complete Stage 8 outcome-coverage history"
+    )
+    history_campaign.add_argument("--recommendation-input", type=Path, required=True)
+    history_campaign.add_argument("--rollback-report", type=Path, required=True)
+    history_campaign.add_argument("--store", type=Path, required=True)
+    history_campaign.add_argument("--output", type=Path, required=True)
 
     explain = subparsers.add_parser(
         "explain", help="explain an immutable persisted policy decision"
@@ -573,6 +581,17 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "history":
             if task_arguments:
                 raise ValueError("qf history does not accept task arguments")
+            if args.history_command == "campaign":
+                source = load_recommendation_input(args.recommendation_input)
+                rollback = load_json_object(args.rollback_report)
+                report = run_decision_campaign(args.store, source, rollback)
+                write_decision_campaign(report, args.output)
+                print(f"Stage 8 decision campaign: {report['status']}")
+                print(f"decision history: {args.store}")
+                print(f"campaign report: {args.output}")
+                for failure in report["failures"]:
+                    print(f"- {failure}", file=sys.stderr)
+                return 0 if report["status"] == "pass" else 1
             store = DecisionStore(args.store)
             if args.history_command == "recommendation":
                 source = load_recommendation_input(args.input)

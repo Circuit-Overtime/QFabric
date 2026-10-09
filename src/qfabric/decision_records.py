@@ -251,6 +251,96 @@ def record_hardware_recovery(
     return records
 
 
+def record_recovery_trace(
+    store: DecisionStore,
+    *,
+    task: str,
+    policy: RecoveryPolicy,
+    observations: list[RecoveryObservation],
+    initial_domain: str,
+    initial_epoch: int,
+    provenance: str,
+) -> list[dict[str, Any]]:
+    report = replay_recovery(
+        policy,
+        observations,
+        initial_domain=initial_domain,
+        initial_epoch=initial_epoch,
+    )
+    records = []
+    for index, observation in enumerate(observations):
+        prefix = observations[: index + 1]
+        prefix_report = replay_recovery(
+            policy,
+            prefix,
+            initial_domain=initial_domain,
+            initial_epoch=initial_epoch,
+        )
+        step = report["steps"][index]
+        actions = step["actions"]
+        action_types = {action["type"] for action in actions}
+        classifications = []
+        if action_types & {"infeasible", "infeasible_hold"}:
+            classifications.append("infeasibility")
+        rollback = next(
+            (
+                action.get("reason")
+                for action in actions
+                if action["type"] == "rollback_armed"
+            ),
+            None,
+        )
+        if rollback is not None:
+            classifications.append("failed_probation")
+        facts = {
+            "provenance": provenance,
+            "decision": {
+                "state_before": step["before"]["state"],
+                "state_after": step["after"]["state"],
+                "actions": actions,
+                "classifications": sorted(classifications),
+            },
+            "contract": None,
+            "observation": {
+                "window": index + 1,
+                "sample_count": None,
+                "confidence": None,
+                "recovery_observation": asdict(observation),
+            },
+            "candidates": [],
+            "thresholds": {
+                "recovery_policy": policy.to_dict(),
+                "cooldown_remaining": step["after"]["cooldown_remaining"],
+                "blacklist_remaining": step["after"]["blacklist_remaining"],
+            },
+            "rollback_condition": rollback,
+            "post_switch_verification": {
+                "target_contract_state": observation.target_contract_state,
+                "protected_contracts_healthy": observation.protected_contracts_healthy,
+                "probation_healthy_streak": step["after"][
+                    "probation_healthy_streak"
+                ],
+                "probation_observed": step["after"]["probation_observed"],
+            },
+        }
+        records.append(
+            store.append(
+                kind="recovery",
+                task=task,
+                policy_name="safe-closed-loop-recovery",
+                policy_version=1,
+                decision_input={
+                    "policy": policy.to_dict(),
+                    "initial": {"domain": initial_domain, "epoch": initial_epoch},
+                    "observations": [asdict(item) for item in prefix],
+                },
+                outcome=prefix_report["steps"][-1],
+                facts=facts,
+            )
+        )
+    return records
+
+
 def replay_decision(record: dict[str, Any]) -> dict[str, Any]:
     if record["kind"] == "recommendation":
         source = record["input"]

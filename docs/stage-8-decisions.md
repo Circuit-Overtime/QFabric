@@ -82,3 +82,28 @@ Replay invokes the recorded policy version over the stored inputs and requires e
 equality with the recorded outcome. Recommendation replay covers the complete filtered Stage 6
 report. Recovery replay covers the policy state after every stored observation prefix, including
 the exact action, domain, epoch, probation, rollback, cooldown, and blacklist state.
+
+## Outcome-coverage campaign
+
+Build a fresh acceptance journal from the audited Stage 6 input and Stage 7 rollback campaign:
+
+```bash
+qf history campaign \
+  --recommendation-input \
+  data/processed/stage6/stage6-recommendations-01/recommendation-input.json \
+  --rollback-report data/processed/stage7/hardware-rollback.json \
+  --store data/processed/stage8/decisions.jsonl \
+  --output data/processed/stage8/decision-campaign.json
+```
+
+The destination journal must be empty. The campaign records five recommendation cases, all nine
+hardware rollback steps, and two explicitly labelled deterministic infeasibility steps. It then
+reopens the journal, validates its hash chain and contiguous identifiers, replays every record,
+and checks that the human rendering carries every machine-readable input, outcome, and explanation
+fact.
+
+Acceptance requires stable records covering `insufficient_evidence`, `unsafe_semantics`,
+`failed_admission`, `excessive_rpc_cost`, `failed_probation`, and `infeasibility`. The synthetic
+recommendation mutations and infeasibility trace validate policy explanations; they are not
+additional hardware-performance observations. Failed probation remains grounded in the real
+Stage 7 rollback campaign.

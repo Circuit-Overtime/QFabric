@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from qfabric.cli import main
+from qfabric.decision_campaign import REQUIRED_CLASSIFICATIONS, run_decision_campaign
 from qfabric.decision_history import DecisionStore
 from qfabric.decision_records import (
     record_hardware_recovery,
@@ -232,6 +233,26 @@ class QFabricDecisionRecordTests(unittest.TestCase):
                 )
             self.assertEqual(status, 0)
             self.assertTrue(json.loads(replayed.getvalue())["matches"])
+
+    def test_stage8_campaign_covers_all_required_outcomes_after_restart(self):
+        source = recommendation_input()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store_path = root / "decisions.jsonl"
+            report = run_decision_campaign(
+                store_path,
+                source,
+                hardware_report(source),
+            )
+            restarted = DecisionStore(store_path)
+            records = restarted.load()
+            self.assertEqual(report["status"], "pass")
+            self.assertEqual(set(report["coverage"]), REQUIRED_CLASSIFICATIONS)
+            self.assertTrue(all(report["coverage"].values()))
+            self.assertEqual(len(records), report["record_count"])
+            self.assertTrue(all(report["checks"].values()))
+            with self.assertRaisesRegex(ValueError, "empty decision history"):
+                run_decision_campaign(store_path, source, hardware_report(source))
 
 
 if __name__ == "__main__":

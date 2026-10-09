@@ -14,7 +14,11 @@ artifact or the STM32/Zephyr RT domain, with explicit domain selection and no pl
 The implementation and acceptance evidence are recorded in the
 [Stage 2 findings](docs/stage-2-findings.md).
 
-Stage 3 defines the versioned cross-domain ABI, generated serialization, and effect classes.
+Stage 3 is complete. It defines the versioned cross-domain ABI, generated serialization, replay
+protection, defensive decoding, and effect classes. The implementation and hardware audit are
+recorded in the [Stage 3 findings](docs/stage-3-findings.md).
+
+Stage 4 implements correlated end-to-end QTask profiling with bounded, measurable overhead.
 
 ## Local checks
 

@@ -110,3 +110,6 @@ qf abi audit --output data/processed/stage3-audit.json
 The audit regenerates the C++ header and golden vectors in memory, runs all compile-fail cases,
 executes the real ARM64 runner, repeats the live MCU vectors and safety scenarios, and verifies
 the effect-policy invariants. Stage 3 is complete only when this command reports `pass`.
+
+The accepted implementation and evidence are summarized in
+[the Stage 3 findings](stage-3-findings.md).
